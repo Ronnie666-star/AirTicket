@@ -1,0 +1,14 @@
+﻿
+> airticket-frontend@0.1.0 dev E:\AirTicket\airTicket\frontend
+> vite
+
+
+  VITE v5.4.21  ready in 266 ms
+
+  ➜  Local:   http://localhost:5173/
+  ➜  Network: http://169.254.29.139:5173/
+  ➜  Network: http://169.254.247.145:5173/
+  ➜  Network: http://10.22.108.27:5173/
+  ➜  Network: http://172.18.128.1:5173/
+23:33:29 [vite] ✨ new dependencies optimized: axios
+23:33:29 [vite] ✨ optimized dependencies changed. reloading

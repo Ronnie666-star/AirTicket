@@ -3,6 +3,6 @@
 spring:
   datasource:
     url: jdbc:mysql://localhost:13306/flights?useUnicode=true&characterEncoding=utf8&serverTimezone=Asia/Shanghai&useSSL=false&allowPublicKeyRetrieval=true
-    username: root
-    password: root
+    username: xkj
+    password: xkj2006
     driver-class-name: com.mysql.cj.jdbc.Driver
