@@ -3,26 +3,39 @@ spring:
   application:
     name: airTicket
   profiles:
-    # 默认走本地测试；Docker 交付由 compose 注入 SPRING_PROFILES_ACTIVE=docker 覆盖。
-    # 注意：不要写 spring.profiles.active 硬编码，否则会压过 compose 注入。
+    # 默认走本地测试；Docker 交付由环境变量 SPRING_PROFILES_ACTIVE=docker 覆盖。
+    # 注意：不要写 spring.profiles.active 硬编码，否则会压过外部注入。
     default: test
-  flyway:
-    enabled: true
-    locations: classpath:db/migration
   jackson:
     date-format: yyyy-MM-dd HH:mm:ss
     time-zone: Asia/Shanghai
+  flyway:
+    enabled: true
+    locations: classpath:db/migration
+
+mybatis:
+  type-aliases-package: com.ronnie.airTicket.infrastructure.persistence.po
+  configuration:
+    # 下划线->驼峰自动映射：sys_user.real_name 直接映射到 realName，SQL 不用起别名
+    map-underscore-to-camel-case: true
 
 server:
   port: 8080
 
-mybatis:
-  mapper-locations: classpath:mapper/*.xml
-  type-aliases-package: com.ronnie.airTicket.infrastructure.persistence.po
-  configuration:
-    map-underscore-to-camel-case: true
-
+# ===== JWT 配置（敏感值不写死，从环境变量注入） =====
 jwt:
-  # HS256 要求密钥 >= 32 字节，交付前请替换为强随机串
-  secret: change-me-in-prod-please-set-a-strong-secret-key-at-least-32-bytes
-  expire-minutes: 1440
+  # 密钥 / 有效期都来自环境变量：本地由 spring-dotenv 读取 backend/.env，
+  # Docker 由 compose 的 env_file 或 docker run --env-file 注入同名变量。
+  # 密钥长度必须 >= 32 字节，否则 HS256 验签会抛 WeakKeyException。
+  secret: ${JWT_SECRET}
+  expire-hours: ${JWT_EXPIRE_HOURS:24}
+
+# ===== spring-dotenv：本地启动时把 backend/.env 注入 Spring 环境 =====
+springdotenv:
+  enabled: true
+  # 相对启动时的工作目录；在 backend/ 下运行 mvn spring-boot:run 即读到 backend/.env
+  directory: .
+  filename: .env
+  # 文件缺失 / 格式异常时不报错，按空配置处理 —— Docker 镜像里没有 .env，靠容器真实环境变量注入
+  ignore-if-missing: true
+  ignore-if-malformed: true
