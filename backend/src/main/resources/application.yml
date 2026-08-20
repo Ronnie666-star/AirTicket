@@ -14,6 +14,7 @@ spring:
     locations: classpath:db/migration
 
 mybatis:
+  mapper-locations: classpath:/mapper/**/*.xml
   type-aliases-package: com.ronnie.airTicket.infrastructure.persistence.po
   configuration:
     # 下划线->驼峰自动映射：sys_user.real_name 直接映射到 realName，SQL 不用起别名

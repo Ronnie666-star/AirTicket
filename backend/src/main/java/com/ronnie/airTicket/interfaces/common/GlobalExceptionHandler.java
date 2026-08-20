@@ -3,6 +3,7 @@ package com.ronnie.airTicket.interfaces.common;
 import com.ronnie.airTicket.domain.exception.AuthenticationException;
 import com.ronnie.airTicket.domain.exception.DomainException;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.dao.DuplicateKeyException;
 import org.springframework.http.HttpStatus;
 import org.springframework.web.bind.MethodArgumentNotValidException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
@@ -41,6 +42,13 @@ public class GlobalExceptionHandler {
                 .findFirst()
                 .orElse("参数错误");
         return ApiResponse.error(400, msg);
+    }
+
+    /** 唯一约束冲突：flight(code, datetime_dep) 等由数据库唯一索引兜底的重复提交，转成 400 而不是 500 */
+    @ExceptionHandler(DuplicateKeyException.class)
+    @ResponseStatus(HttpStatus.BAD_REQUEST)
+    public ApiResponse<Void> handleDuplicateKey(DuplicateKeyException e) {
+        return ApiResponse.error(400, "数据已存在，请勿重复提交");
     }
 
     /** 路径不存在：Spring 6.1 对未映射路径抛 NoResourceFoundException，这里转成 404 而不是 500 */

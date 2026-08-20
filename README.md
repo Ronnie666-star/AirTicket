@@ -236,3 +236,9 @@ sys_user 1─N passenger（user_id）
 - **前端**：已删除；
 - **数据库**：依据本文档第二节的 9 张表设计，全部由 `V1_Info.sql` 实现；
 - 具体业务代码（登录 / 查询 / 订票 / 支付 / 核销 / 退订 / 改签）待实现。
+
+## 七、各层怎么切？
+
+1. Controller/Service 按照业务范围
+2. Repository 按照聚合根
+3. Mapper 按表

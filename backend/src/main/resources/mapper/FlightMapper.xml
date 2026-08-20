@@ -1,0 +1,98 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.ronnie.airTicket.infrastructure.mapper.FlightMapper">
+
+    <!-- ===== 读侧：航班搜索（动态 SQL）===== -->
+
+    <!--
+        航班搜索：所有筛选条件都可空，传了才进 WHERE；只有按机场名筛才 JOIN airport。
+        起落地"城市"就是 flight 表自带的 region_dep / region_arr，大部分查询单表就够了。
+    -->
+    <select id="search" resultType="com.ronnie.airTicket.infrastructure.persistence.query.FlightSearchQO">
+        SELECT f.id,
+               f.code,
+               f.datetime_dep,
+               f.datetime_arr,
+               f.region_dep,
+               f.region_arr,
+               f.gate,
+               f.distance,
+               f.price,
+               f.status
+        FROM flight f
+        <!-- 只有按机场全名筛（airport.name）才需要 join，否则不 join -->
+        <if test="airportName != null and airportName != ''">
+            JOIN airport ad ON f.id_airport_dep = ad.id
+            JOIN airport ar ON f.id_airport_arr = ar.id
+        </if>
+        <where>
+            <if test="depCity != null and depCity != ''">
+                AND f.region_dep = #{depCity}
+            </if>
+            <if test="arrCity != null and arrCity != ''">
+                AND f.region_arr = #{arrCity}
+            </if>
+            <!-- 按出发日期筛：当天 00:00 到次日 00:00 一整天 -->
+            <if test="depDate != null">
+                AND f.datetime_dep &gt;= #{depDate}
+                AND f.datetime_dep &lt; DATE_ADD(#{depDate}, INTERVAL 1 DAY)
+            </if>
+            <if test="priceMin != null">
+                AND f.price &gt;= #{priceMin}
+            </if>
+            <if test="priceMax != null">
+                AND f.price &lt;= #{priceMax}
+            </if>
+            <if test="planeId != null">
+                AND f.id_plane = #{planeId}
+            </if>
+            <if test="airportName != null and airportName != ''">
+                AND (ad.name = #{airportName} OR ar.name = #{airportName})
+            </if>
+        </where>
+        ORDER BY f.datetime_dep
+    </select>
+
+    <!-- ===== 写侧：聚合读写 ===== -->
+
+    <select id="findById" resultType="FlightPO">
+        SELECT id, id_plane, id_airport_dep, id_airport_arr, code, datetime_dep, datetime_arr,
+               region_dep, region_arr, distance, seat_first_class, seat_business_class, seat_economy_class,
+               price, cancellation_fee, gate, status, create_at
+        FROM flight
+        WHERE id = #{id}
+    </select>
+
+    <!-- useGeneratedKeys：把自增主键回填到 po.id；create_at 不写，交给 DEFAULT CURRENT_TIMESTAMP -->
+    <insert id="insert" useGeneratedKeys="true" keyProperty="id">
+        INSERT INTO flight (id_plane, id_airport_dep, id_airport_arr, code, datetime_dep, datetime_arr,
+                            region_dep, region_arr, distance, seat_first_class, seat_business_class,
+                            seat_economy_class, price, cancellation_fee, gate, status)
+        VALUES (#{idPlane}, #{idAirportDep}, #{idAirportArr}, #{code}, #{datetimeDep}, #{datetimeArr},
+                #{regionDep}, #{regionArr}, #{distance}, #{seatFirstClass}, #{seatBusinessClass},
+                #{seatEconomyClass}, #{price}, #{cancellationFee}, #{gate}, #{status})
+    </insert>
+
+    <!-- 全字段更新；唯一性由 (code, datetime_dep) 唯一索引兜底，撞了抛 DuplicateKeyException -->
+    <update id="update">
+        UPDATE flight
+        SET id_plane = #{idPlane},
+            id_airport_dep = #{idAirportDep},
+            id_airport_arr = #{idAirportArr},
+            code = #{code},
+            datetime_dep = #{datetimeDep},
+            datetime_arr = #{datetimeArr},
+            region_dep = #{regionDep},
+            region_arr = #{regionArr},
+            distance = #{distance},
+            seat_first_class = #{seatFirstClass},
+            seat_business_class = #{seatBusinessClass},
+            seat_economy_class = #{seatEconomyClass},
+            price = #{price},
+            cancellation_fee = #{cancellationFee},
+            gate = #{gate},
+            status = #{status}
+        WHERE id = #{id}
+    </update>
+
+</mapper>
