@@ -63,6 +63,17 @@
         WHERE id = #{id}
     </select>
 
+    <!-- 写路径加锁读：FOR UPDATE 给这一行上排他锁，事务提交才释放。 -->
+    <!-- 它跟 findById 的差别就是多 FOR UPDATE；调用方必须在 @Transactional 里用，否则锁立刻释放没用。 -->
+    <select id="findByIdForUpdate" resultType="FlightPO">
+        SELECT id, id_plane, id_airport_dep, id_airport_arr, code, datetime_dep, datetime_arr,
+               region_dep, region_arr, distance, seat_first_class, seat_business_class, seat_economy_class,
+               price, cancellation_fee, gate, status, create_at
+        FROM flight
+        WHERE id = #{id}
+        FOR UPDATE
+    </select>
+
     <!-- useGeneratedKeys：把自增主键回填到 po.id；create_at 不写，交给 DEFAULT CURRENT_TIMESTAMP -->
     <insert id="insert" useGeneratedKeys="true" keyProperty="id">
         INSERT INTO flight (id_plane, id_airport_dep, id_airport_arr, code, datetime_dep, datetime_arr,

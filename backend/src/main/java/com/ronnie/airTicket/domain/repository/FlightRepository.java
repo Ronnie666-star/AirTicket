@@ -10,8 +10,15 @@ import java.util.Optional;
  */
 public interface FlightRepository {
 
+    /** 普通读：查询 / 展示路径用，不加锁。 */
     Optional<Flight> findById(Long id);
 
-    /** 保存聚合：内部判断 id==null 走 insert（主键回填），否则走 update。 */
-    void save(Flight flight);
+    /** 加锁读：写路径"读-改-写"用（FOR UPDATE），防并发删改。调用方必须在 @Transactional 内。 */
+    Optional<Flight> findByIdForUpdate(Long id);
+
+    /**
+     * 保存聚合：内部判断 id==null 走 insert（主键回填），否则走 update。
+     * @return 是否真正改了行。update 没碰到任何行（0 行，锁后已被并发删除）返回 false。
+     */
+    boolean save(Flight flight);
 }

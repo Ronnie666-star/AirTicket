@@ -64,17 +64,23 @@ public class FlightAppService {
         return FlightDetailResult.from(flight);
     }
 
-    /** 更新航班：先按 id 加载聚合（不存在则报错），再改运行字段，最后存回。 */
+    /**
+     * 更新航班：先加锁读（FOR UPDATE）拿聚合，再改运行字段，最后存回。
+     * 锁 + 行数校验两层防并发：锁保证"读-改-写"期间没有别的写/删交错；
+     * save 返回 false（更新 0 行）说明这行在锁后已被并发删除，直接报"航班不存在"。
+     */
     @Transactional
     public FlightDetailResult update(Long id, FlightUpdateCommand cmd) {
-        Flight flight = flightRepository.findById(id)
+        Flight flight = flightRepository.findByIdForUpdate(id)
                 .orElseThrow(() -> new FlightNotFoundException(id));
         flight.update(
                 cmd.datetimeDep(), cmd.datetimeArr(),
                 cmd.seatFirstClass(), cmd.seatBusinessClass(), cmd.seatEconomyClass(),
                 cmd.price(), cmd.cancellationFee(), cmd.gate(), cmd.status()
         );
-        flightRepository.save(flight);   // 内部发现 id != null → UPDATE
+        if (!flightRepository.save(flight)) {   // 0 行 = 锁后已被并发删除
+            throw new FlightNotFoundException(id);
+        }
         return FlightDetailResult.from(flight);
     }
 }

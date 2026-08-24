@@ -35,6 +35,9 @@ public interface FlightMapper {
     /** 按 id 取一行，给 Repository 加载聚合用。 */
     FlightPO findById(@Param("id") Long id);
 
+    /** 按 id 取一行并加行锁（FOR UPDATE）：写路径"读-改-写"用，防并发删改。必须配合 @Transactional 使用。 */
+    FlightPO findByIdForUpdate(@Param("id") Long id);
+
     /** 插入一行，自增主键回填到 po.getId()（useGeneratedKeys）。返回受影响行数。 */
     int insert(FlightPO po);
 
