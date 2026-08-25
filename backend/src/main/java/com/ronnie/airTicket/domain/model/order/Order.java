@@ -1,6 +1,7 @@
 package com.ronnie.airTicket.domain.model.order;
 
 import com.ronnie.airTicket.domain.exception.DomainException;
+import com.ronnie.airTicket.domain.model.flight.CabinClass;
 import lombok.Getter;
 
 import java.math.BigDecimal;
@@ -11,7 +12,9 @@ import java.time.LocalDateTime;
  *
  * 领域规则长在这里，每个状态流转都是一段业务规则：
  *   下单        -> 待出票 / 未支付（构造时）
- *   支付        -> 已支付 / 已出票（pay）
+ *   支付(发起)  -> 支付中（pay）
+ *   支付确认成功 -> 已支付 / 已出票（confirmPaid）
+ *   支付确认失败 -> 回退 未支付 / 待出票（confirmFailed）
  *   未支付取消   -> 已取消（cancelUnpaid）
  *   退订退款     -> 已退款 / 已退订（cancelRefund）
  *   核销        -> 已核销（verify）
@@ -27,6 +30,7 @@ public class Order {
     private final Long userId;
     private final Long channelId;
     private final String code;
+    private final CabinClass cabinClass;      // 舱级：下单时锁定，改签不变
     private BigDecimal totalPrice;            // 可改：改签"多退少补"
     private BigDecimal totalTax;
     private PayStatus payStatus;
@@ -37,12 +41,15 @@ public class Order {
     private String remark;
     private final LocalDateTime createAt;     // 新建时为 null，由数据库 DEFAULT CURRENT_TIMESTAMP 填
 
-    public Order(Long id, Long flightId, Long userId, Long channelId, String code,
+    public Order(Long id, Long flightId, Long userId, Long channelId, String code, CabinClass cabinClass,
                  BigDecimal totalPrice, BigDecimal totalTax, PayStatus payStatus, OrderStatus orderStatus,
                  LocalDateTime payTime, LocalDateTime issueTime, LocalDateTime cancelTime,
                  String remark, LocalDateTime createAt) {
         if (flightId == null || userId == null || channelId == null || code == null || code.isBlank()) {
             throw new DomainException("订单必须关联航班、用户和渠道，且订单号不能为空");
+        }
+        if (cabinClass == null) {
+            throw new DomainException("订单必须指定舱级");
         }
         if (totalPrice == null || totalTax == null || totalPrice.signum() < 0 || totalTax.signum() < 0) {
             throw new DomainException("订单金额非法");
@@ -52,6 +59,7 @@ public class Order {
         this.userId = userId;
         this.channelId = channelId;
         this.code = code;
+        this.cabinClass = cabinClass;
         this.totalPrice = totalPrice;
         this.totalTax = totalTax;
         this.payStatus = payStatus;
@@ -63,15 +71,34 @@ public class Order {
         this.createAt = createAt;
     }
 
-    /** 支付：只有未支付订单能支付，支付后出票。 */
+    /** 支付发起：只有未支付订单能发起，置"支付中"，不改变订单状态、不产生出票时间。 */
     public void pay() {
         if (payStatus != PayStatus.UNPAID) {
             throw new DomainException("只有未支付订单才能支付");
+        }
+        this.payStatus = PayStatus.PROCESSING;
+    }
+
+    /** 支付确认成功：支付中 -> 已支付 + 已出票，记录支付/出票时间。 */
+    public void confirmPaid() {
+        if (payStatus != PayStatus.PROCESSING) {
+            throw new DomainException("当前订单状态不可确认支付");
         }
         this.payStatus = PayStatus.PAID;
         this.payTime = LocalDateTime.now();
         this.orderStatus = OrderStatus.ISSUED_TICKET;
         this.issueTime = LocalDateTime.now();
+    }
+
+    /** 支付确认失败：支付中 -> 回退 未支付 + 待出票，清空支付/出票时间。 */
+    public void confirmFailed() {
+        if (payStatus != PayStatus.PROCESSING) {
+            throw new DomainException("当前订单状态不可确认支付");
+        }
+        this.payStatus = PayStatus.UNPAID;
+        this.payTime = null;
+        this.issueTime = null;
+        this.orderStatus = OrderStatus.PENDING_TICKET_ISSUANCE;
     }
 
     /** 未支付取消：只有未支付订单能取消（不退款）。 */

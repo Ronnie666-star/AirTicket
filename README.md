@@ -1,244 +1,192 @@
-# 飞机售票系统 —— 数据库设计
+# AirTicket · 飞机票订票系统
 
-> 数据库课程设计文档，依据 `DATABASE.md` 整理。
-> 项目现状：后端仅保留全局异常处理骨架（`GlobalExceptionHandler` / `ApiResponse` / `DomainException`），前端已删除，业务代码待实现。
+一个可运行的**精简版真实飞机票订票系统**（DDD 架构），覆盖从登录到退改签的完整交易链路，并带管理后台与 Apple 风格前端。
+
+技术栈：Spring Boot 3.2 + JDK 17 + MyBatis + Flyway + MySQL（后端）· Vue 3 + Vite + Pinia + Axios（前端）· Docker（交付）。
 
 ---
 
-## 一、系统功能
+## 一、功能一览
 
-| # | 功能 | 说明 |
+### 1. 账号与权限（三种角色）
+
+| 角色 | 如何产生 | 权限 |
 |---|---|---|
-| 1 | 登录 | 用户 / 商家 / 管理员按角色登录 |
-| 2 | 查询 | ① 机票：出发地点、到达地点、出发日期+时间、到达日期+时间、航空公司、价格、时长、舱级；② 订单：状态、时间、航司。**只能查自己的订单**：`WHERE id_user = ${userId}` |
-| 3 | 订票 | 商家放票；用户订票 |
-| 4 | 支付 | 商家收款；用户付款；第三方（渠道）暂存 |
-| 5 | 核销 | 改变 `orders` 状态 |
-| 6 | 退订 | 用户收款；第三方退款 |
-| 7 | 改签 | 改变 `orders` 指向的航班，多退少补，限制改签时间、限制改签航司 |
+| **管理员 ADMIN** | 系统初始化时创建（**唯一入口**，只允许一次） | 用户管理、基础数据管理、放票、核销、改签 |
+| **商家 MERCHANT** | 由管理员分配（`POST /admin/users`） | 放票、核销、改签 |
+| **旅客 PASSENGER** | 自助注册（`POST /register`） | 订票、支付、退订、查自己的订单 |
+
+> 三种角色各司其职，不存在其他创建路径：注册恒为旅客、管理员建用户恒为商家、管理员只由初始化端点创建。
+
+### 2. 核心业务
+
+- **登录 / 注册 / 初始化**：JWT 无状态登录（BCrypt 密码）；首次运行先 `POST /init/admin` 创建初始管理员，再注册 / 分配账号。
+- **航班**：搜索（起降地 / 日期 / 价格 / 机型 / 机场）、详情、**头等 / 商务 / 经济三舱**价格与余票。
+- **订票**：选择舱级下单，按舱扣余票、按舱计价，`FOR UPDATE` 防超卖；只查自己的订单。
+- **支付（两段式模拟第三方渠道）**：`pay()` 生成支付单、订单进入"支付中"，用户面确认或模拟渠道回调（`X-Channel-Token`）后置"已支付 / 已出票"；失败回退并回补余票；启动自愈清理遗留"支付中"。
+- **核销**：商家 / 管理员对已出票订单核销。
+- **退订退款**：已支付订单退订 → 退款 = `总价 − 退票费`（`cancellation_fee`），回补余票；未支付直接取消。
+- **改签**：商家 / 管理员操作，限制**同航司**、旧航班**未起飞**、按订单舱级互换余票，**同舱价差多退少补**。
+- **个人中心**：查改资料、改密码；**常用乘机人**增删查。
+- **实时轨迹**：按航班查高度 / 速度 / 经纬度 / 剩余距离时间。
+- **基础数据**（管理员）：航司 / 机场 / 机型 / 渠道 CRUD，删除引用数据受保护。
+
+### 3. 前端（Apple 设计理念 · 简约高端）
+
+登录 / 注册 / 初始化向导、航班搜索与详情、选舱订票、模拟支付、我的订单与操作、个人中心、管理后台（用户 / 基础数据 / 放票）。统一设计令牌（系统字体、白 / 浅灰底、品牌蓝、圆角、柔和阴影、大留白）。
+
+### 4. 数据库（Flyway 管理）
+
+9 张表（`sys_user` / `flight` / `orders` / `channel` / `route` / `plane` / `airline` / `airport` / `passenger`）。迁移：
+- `V1` 建表 · `V2` 种子占位（**不含任何演示账号**）· `V3` 舱级（`orders.cabin_class` + `flight` 三舱价列）。
+- 无内置账号：初始化端点建管理员；"官方网站"渠道由启动自愈自动插入。
 
 ---
 
-## 二、数据库表设计（9 张表）
-
-> 9 张表全部由 `V1_Info.sql` 实现。
-
-### 1. `sys_user` —— 用户表
-
-> 已由 `V1_Info.sql` 实现。表名用 `sys_user`（`user` 是 SQL 保留字）。
-
-| 字段 | 说明 |
-|---|---|
-| id | 主键，自增 |
-| username | 用户名，`NOT NULL UNIQUE`，`CHECK` 限 6–10 字符 |
-| password | 密码，`CHECK` 要求含大写 / 小写 / 数字 / 符号中至少三类（若用 BCrypt 加密需把列加长到 60，且此约束应移到应用层校验） |
-| real_name | 真实姓名 |
-| age | 年龄 |
-| email | 邮箱，`CHECK` 校验邮箱格式；与 `phone` 至少填一个 |
-| phone | 手机号，`CHECK` 校验 11 位大陆手机号（`1` 开头，第二位 3–9，如 `18059522387`） |
-| status | 状态（默认启用） |
-| role | 角色（旅客 / 商家 / 管理员） |
-| create_at | 创建时间 |
-
-### 2. `flight` —— 航班表
-
-> 狭义的"航班"：一趟在任何时间任何地点都唯一的一次飞行旅程。
-
-| 字段 | 说明 |
-|---|---|
-| id | 主键 |
-| id_plane | 机型 → `plane.id` |
-| id_airport_dep | 出发机场 → `airport.id` |
-| id_airport_arr | 到达机场 → `airport.id` |
-| code | 航班号（如 CA1831） |
-| datetime_dep | 出发日期 + 时间 |
-| datetime_arr | 到达日期 + 时间 |
-| region_dep | 出发地区（冗余，便于按地区查询） |
-| region_arr | 到达地区 |
-| distance | 距离（公里） |
-| seat_first_class | 头等舱余票 |
-| seat_business_class | 商务舱余票 |
-| seat_economy_class | 经济舱余票 |
-| price | 票价 |
-| cancellation_fee | 退票费 |
-| gate | 登机口 |
-| status | 航班状态（未开始 / 进行中 / 已结束 / 取消） |
-| create_at | 创建时间 |
-
-> 已由 `V1_Info.sql` 实现。`(code, datetime_dep)` 唯一（一趟飞行唯一），由 `UNIQUE INDEX idx_feature` 保证。
-
-**状态展示规则**：
-- `status = "未开始"`：显示的出发时间都是首发 `datetime_dep`；
-- `status = "已结束"` / `"取消"` / `"进行中"`：显示的就是真实 `datetime_dep`。
-
-### 3. `channel` —— 渠道表（第三方）
-
-> 已由 `V1_Info.sql` 实现。
-
-| 字段 | 说明 |
-|---|---|
-| id | 主键，自增 |
-| channel_name | 渠道名（如支付平台 / 销售渠道），`UNIQUE` |
-| api_gateway_url | 第三方 API 网关地址 |
-
-### 4. `orders` —— 订单表
-
-> 已由 `V1_Info.sql` 实现。表名用 `orders`（`order` 是 SQL 保留字）；`pay_time` / `issue_time` / `cancel_time` 可空，未发生则为 NULL。
-
-| 字段 | 说明 |
-|---|---|
-| id | 主键，自增 |
-| id_flight | 航班 → `flight.id` |
-| id_user | 下单用户 → `sys_user.id` |
-| id_channel | 渠道 → `channel.id` |
-| code | 订单号，`NOT NULL UNIQUE` |
-| total_price | 总价 |
-| total_tax | 总税费 |
-| pay_status | 支付状态（未支付 / 已支付 / 已退款） |
-| order_status | 订单状态（待出票 / 已出票 / 已核销 / 已退订 / 已改签 / 已取消） |
-| pay_time | 支付时间（未支付可空） |
-| issue_time | 出票时间（未出票可空） |
-| cancel_time | 取消 / 退订时间（未发生可空） |
-| remark | 备注 |
-| create_at | 创建时间 |
-
-### 5. `route` —— 航班实时轨迹表
-
-> 已由 `V1_Info.sql` 实现。
-
-| 字段 | 说明 |
-|---|---|
-| id | 主键，自增 |
-| id_flight | 航班 → `flight.id` |
-| distance_remain | 剩余距离 |
-| time_remain | 剩余时间 |
-| altitude | 高度 |
-| speed | 速度 |
-| latitude | 纬度（`CHECK` 限 -90~90） |
-| longitude | 经度（`CHECK` 限 -180~180） |
-| time_stamp | 数据采集时间戳 |
-| create_at | 创建时间 |
-
-> 说明：这是航班飞行过程中的**实时状态表**（位置 / 高度 / 速度）。`id_flight` 带唯一索引（`idx_route_flight`），当前设计下每趟航班只保留一条轨迹记录。
-
-### 6. `plane` —— 机型表
-
-> 已由 `V1_Info.sql` 实现。`DATABASE.md` 的 `max_economy_class` 按其余两舱命名统一为 `max_seat_economy_class`。
-
-| 字段 | 说明 |
-|---|---|
-| id | 主键，自增 |
-| id_airline | 所属航空公司 → `airline.id` |
-| model_name | 型号（如 A320），`UNIQUE` |
-| length | 长度 |
-| wingspan | 翼展 |
-| height | 高度 |
-| max_takeoff_weight_kg | 最大起飞重量（kg） |
-| max_landing_weight_kg | 最大着陆重量（kg），`CHECK` 不大于起飞重量 |
-| max_seat_first_class | 头等舱最大座位数 |
-| max_seat_business_class | 商务舱最大座位数 |
-| max_seat_economy_class | 经济舱最大座位数 |
-| create_at | 创建时间 |
-
-### 7. `airline` —— 航空公司表
-
-> 已由 `V1_Info.sql` 实现。
-
-| 字段 | 说明 |
-|---|---|
-| id | 主键，自增 |
-| name | 航司名称，`UNIQUE` |
-| create_at | 创建时间 |
-
-### 8. `airport` —— 机场表
-
-> 已由 `V1_Info.sql` 实现。
-
-| 字段 | 说明 |
-|---|---|
-| id | 主键，自增 |
-| name | 机场名称，`UNIQUE` |
-| region | 所属地区（索引） |
-| create_at | 创建时间 |
-
-### 9. `passenger` —— 常乘机人表
-
-> 含义已确认：这张表表示**某个 `sys_user` 账号（`user_id`）下的常用乘机人列表**，`passenger_id` 指向另一位系统用户，两个外键都指向 `sys_user.id`（若 `user_id = passenger_id`，即用户把自己加为常用乘机人）。已由 `V1_Info.sql` 实现，`(user_id, passenger_id)` 唯一（同一账号不会重复添加同一乘机人）。
-
-| 字段 | 说明 |
-|---|---|
-| id | 主键，自增 |
-| user_id | 归属用户 → `sys_user.id` |
-| passenger_id | 常用乘机人 → `sys_user.id`（乘机人本人也是系统用户） |
-| create_at | 添加时间 |
-
----
-
-## 三、表关系
+## 二、目录结构
 
 ```
-airline 1─N plane ──1
-                    N
-flight.id_plane ────┘
-  ├── id_airport_dep ──▶ airport（出发机场）
-  ├── id_airport_arr ──▶ airport（到达机场）
-  ├── 1─N orders ──1 sys_user
-  │         └──1 channel
-  ├── 1─1 route（实时轨迹：id_flight）
-sys_user 1─N passenger（user_id）
+airTicket/
+├── backend/                    # Spring Boot 后端（DDD：interfaces → application → domain → infrastructure）
+│   ├── pom.xml                 # 构建；jar 名固定 app.jar
+│   ├── .env.example            # 环境变量模板（JWT_SECRET / JWT_EXPIRE_HOURS）
+│   └── src/main/
+│       ├── java/com/ronnie/airTicket/
+│       ├── resources/
+│       │   ├── application.yml              # 公共配置（默认 profile=test）
+│       │   ├── application-test.yml         # 本地：jdbc:mysql://localhost:13306/flights
+│       │   ├── application-docker.yml       # Docker：jdbc:mysql://mysql_airTicket:3306/flights
+│       │   └── db/migration/                # Flyway：V1 建表 / V2 占位 / V3 舱级
+│       └── ...
+├── frontend/                   # Vue 3 + Vite（pnpm）
+│   ├── vite.config.js          # dev 端口 3000，/api 代理 → http://localhost:8080
+│   └── src/                    # 组件 / 页面 / stores / api
+├── Dockerfile                  # 多阶段：Maven 构建后端 + pnpm 构建前端 → JRE+nginx 单镜像
+├── compose.yml                 # mysql + app 两服务
+├── deploy/
+│   ├── nginx.conf              # 前端静态托管 + /api 反代到同容器 8080
+│   └── start.sh                # 容器入口：nginx 后台 + java 前台
+└── openspec/                   # OpenSpec 变更规划（specs / design / tasks）
 ```
 
-关键外键：
+---
 
-| 外键 | 指向 |
-|---|---|
-| `flight.id_plane` | `plane.id` |
-| `flight.id_airport_dep` / `flight.id_airport_arr` | `airport.id` |
-| `orders.id_flight` / `orders.id_user` / `orders.id_channel` | `flight.id` / `sys_user.id` / `channel.id` |
-| `route.id_flight` | `flight.id` |
-| `plane.id_airline` | `airline.id` |
-| `passenger.user_id` / `passenger.passenger_id` | `sys_user.id` |
+## 三、本地开发启动（IDEA + pnpm dev）
+
+> 数据库：本机 Docker 起一个 MySQL（或任何 `localhost:13306` 上的 MySQL 8）。
+
+**1. 准备环境变量**
+
+```bash
+# 首次：把模板复制为本地配置（.env 已被 git 忽略，不入库）
+cp backend/.env.example backend/.env
+# 填入真实值：JWT_SECRET 长度 ≥ 32 字节（可用 openssl rand -base64 48 生成）
+```
+
+**2. 启动数据库（MySQL 容器）**
+
+```bash
+# 在仓库根目录（compose.yml 所在处）
+docker compose up -d mysql     # 只起数据库；宿主 13306 → 容器 3306
+```
+
+**3. IDEA 启动后端**
+
+- 打开 `backend/pom.xml`（JDK 17），直接 Run `BackendApplication`。
+- 默认 profile `test` 自动生效（连 `localhost:13306`），无需配参数。
+- 启动时 Flyway 建表，并在无渠道时自动插入"官方网站"。
+
+**4. 启动前端**
+
+```bash
+cd frontend
+pnpm install      # 首次
+pnpm dev          # Vite :3000，/api 代理 → localhost:8080
+```
+
+浏览器访问 **http://localhost:3000**。
+
+**5. 初始化系统**
+
+首次运行时页面会引导你**创建初始管理员**（对应 `POST /init/admin`，仅空库可用）：
+
+```bash
+curl -X POST http://localhost:8080/init/admin -H "Content-Type: application/json" \
+  -d '{"username":"admin01","password":"Admin@2024","realName":"管理员","age":28,"email":"admin@airticket.com"}'
+```
+
+然后：注册一个旅客（前端注册页）→ 管理员登录后台 **创建商家** → 三方登录即可使用。
 
 ---
 
-## 四、索引建议
+## 四、Docker 交付启动
 
-按功能查询路径（见第一节）：
+> 一条命令跑起「前端 nginx + 后端 java + MySQL」三个进程（两个镜像）。
 
-| 查询 | 索引 |
-|---|---|
-| 机票：出发地区 → 到达地区 → 日期 | `flight(region_dep, region_arr, datetime_dep)` |
-| 航班号 + 出发时间精确查 | `flight(code, datetime_dep)` 唯一索引（SQL 已建 `idx_feature`） |
-| 订单：只能查自己的 | `orders(id_user)`，`orders(code)` 唯一索引 |
-| 实时轨迹 | `route(id_flight)` 唯一索引（SQL 已建 `idx_route_flight`） |
-| 常乘机人 | `passenger(user_id)` |
+**1. 构建与启动**
+
+```bash
+# 仓库根目录
+mvn -f backend/pom.xml package -DskipTests   # 1. 打包后端 → backend/target/app.jar
+docker build -t airticket-app .              # 2. 构建应用镜像（内部再跑 pnpm build 前端）
+docker compose up -d --build                 # 3. 启动 mysql + app
+```
+
+> `mvn package` 与 `docker build` 两步可被第 3 步的 `--build` 合并，但分开跑更易排查构建问题。
+
+**2. 访问**
+
+浏览器打开 **http://localhost:2357**（宿主 2357 → 容器 nginx :80 → 反代 /api → 同容器 java :8080 → `mysql_airTicket:3306`）。
+
+**3. 初始化与数据**
+
+- 首次启动 Flyway 自动建表；同样先 `POST /init/admin`（或走前端初始化向导）建初始管理员。
+- 数据库数据落在 `mysql-data` 卷；`docker compose down` 不删卷，`docker compose down -v` 才清库重来。
+
+**4. 常用命令**
+
+```bash
+docker compose ps                 # 查看状态
+docker compose logs -f app        # 看应用日志
+docker compose down               # 停止（保留数据卷）
+docker compose down -v            # 停止并清空数据库
+```
 
 ---
 
-## 五、大数据量处理策略
+## 五、两种启动方式对照
 
-数据量大时按需选择：
-
-| # | 方案 | 说明 |
+| 项 | 本地（IDEA + pnpm） | Docker |
 |---|---|---|
-| 1 | 常查询列建索引 | B+ 树二分查找，加速常用查询 |
-| 2 | 表分区 | 使用数据库内置分区功能（如按时间分区） |
-| 3 | 冷热表 | 久远数据放到其他库 |
-| 4 | 分库分表 | MyCat / ShardingSphere |
-| 5 | 异构索引 | 引入其他搜索引擎 |
-| 6 | 读写分离 | 只读从库 + 写主库 |
+| 数据库 | `localhost:13306`（本机 MySQL 容器） | `mysql_airTicket:3306`（compose 内网） |
+| 后端 | IDEA Run，默认 profile `test` | jar 跑在容器，profile `docker`（`SPRING_PROFILES_ACTIVE` 注入） |
+| 前端 | `pnpm dev` → :3000，Vite 代理 | nginx :80 托管 dist，反代 /api |
+| 访问地址 | http://localhost:3000 | http://localhost:2357 |
+| 切换机制 | Spring Profile + 前端代理地址一致（`localhost:8080`） | 无需改代码 |
+
+**核心机制**：本地与 Docker 用同一个 **Spring Profile 开关**切换——IDEA 走默认 `test`，compose 注入 `SPRING_PROFILES_ACTIVE=docker`；前端始终把 `/api` 指向 `localhost:8080`，本地由 Vite 代理、容器由 nginx 反代，**前端代码零改动**。
 
 ---
 
-## 六、项目现状
+## 六、环境变量
 
-- **后端**：Spring Boot 3.2 + JDK 17 骨架，仅保留全局异常处理 —— `interfaces/common/GlobalExceptionHandler.java`（领域异常 → 400、参数校验异常 → 400、兜底 → 500）、`ApiResponse.java`、`domain/exception/DomainException.java`；
-- **前端**：已删除；
-- **数据库**：依据本文档第二节的 9 张表设计，全部由 `V1_Info.sql` 实现；
-- 具体业务代码（登录 / 查询 / 订票 / 支付 / 核销 / 退订 / 改签）待实现。
+| 变量 | 默认值 | 说明 |
+|---|---|---|
+| `JWT_SECRET` | `airTicket-please-change-this-secret-key-0123456789` | JWT 签名密钥，**≥ 32 字节** |
+| `JWT_EXPIRE_HOURS` | `24` | 令牌有效期（小时） |
+| `PAY_CALLBACK_TOKEN` | `channel-simulate-secret` | 模拟渠道回调端点鉴权令牌（公网需改强） |
+| `CORS_ALLOWED_ORIGINS` | `http://localhost:3000` | 允许的跨域来源（逗号分隔） |
 
-## 七、各层怎么切？
+本地读 `backend/.env`（spring-dotenv）；Docker 用 compose 环境注入同名变量（缺省走默认值）。
 
-1. Controller/Service 按照业务范围
-2. Repository 按照聚合根
-3. Mapper 按表
+---
+
+## 七、常见问题
+
+- **初始化提示「系统已初始化」**：`/init/admin` 只在空库可用。想重来 → `docker compose down -v`（清库）后重启，或删 `flights` 库重建。
+- **登录 401**：账号禁用 / 用户名密码错 / 令牌过期；后台可启用账号或重置密码。
+- **端口被占**：Vite 默认 :3000、后端 :8080，被占用时以终端实际打印为准（后端改 `server.port`）。
+- **前端登录失败**：确认后端在 :8080、`.env` 里 `JWT_SECRET` 已配置。
+- **Docker 起不来**：先 `docker compose logs -f app`；常见是 MySQL 未就绪（compose 已用 healthcheck 等待）或 `mvn package` 未执行。
+
+> 本项目为课程设计 / 演示用途：支付为**模拟渠道**、支付单为**内存存储**（重启由启动自愈兜底），数据不用于生产。

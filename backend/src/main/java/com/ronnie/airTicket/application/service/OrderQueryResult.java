@@ -13,6 +13,7 @@ public record OrderQueryResult(
         Long userId,
         Long channelId,
         String code,
+        String cabinClass,
         BigDecimal totalPrice,
         BigDecimal totalTax,
         String payStatus,

@@ -1,0 +1,41 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.ronnie.airTicket.infrastructure.mapper.ChannelMapper">
+
+    <select id="list" resultType="ChannelPO">
+        SELECT id, channel_name, api_gateway_url FROM channel ORDER BY id
+    </select>
+
+    <select id="findById" resultType="ChannelPO">
+        SELECT id, channel_name, api_gateway_url FROM channel WHERE id = #{id}
+    </select>
+
+    <select id="findByName" resultType="ChannelPO">
+        SELECT id, channel_name, api_gateway_url FROM channel WHERE channel_name = #{channelName}
+    </select>
+
+    <insert id="insert" useGeneratedKeys="true" keyProperty="id">
+        INSERT INTO channel (channel_name, api_gateway_url) VALUES (#{channelName}, #{apiGatewayUrl})
+    </insert>
+
+    <!-- 启动自愈：channel_name 唯一索引保证并发安全（已存在则 0 行，po.id 保持 null） -->
+    <insert id="insertIfAbsentByName" useGeneratedKeys="true" keyProperty="id">
+        INSERT INTO channel (channel_name, api_gateway_url)
+        SELECT #{channelName}, #{apiGatewayUrl} FROM DUAL
+        WHERE NOT EXISTS (SELECT 1 FROM channel WHERE channel_name = #{channelName})
+    </insert>
+
+    <update id="update">
+        UPDATE channel SET channel_name = #{channelName}, api_gateway_url = #{apiGatewayUrl} WHERE id = #{id}
+    </update>
+
+    <delete id="delete">
+        DELETE FROM channel WHERE id = #{id}
+    </delete>
+
+    <!-- 删除前引用保护：该渠道被多少订单引用 -->
+    <select id="countByChannelId" resultType="long">
+        SELECT COUNT(*) FROM orders WHERE id_channel = #{channelId}
+    </select>
+
+</mapper>

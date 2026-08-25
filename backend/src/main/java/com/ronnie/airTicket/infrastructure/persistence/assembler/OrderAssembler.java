@@ -1,5 +1,6 @@
 package com.ronnie.airTicket.infrastructure.persistence.assembler;
 
+import com.ronnie.airTicket.domain.model.flight.CabinClass;
 import com.ronnie.airTicket.domain.model.order.Order;
 import com.ronnie.airTicket.domain.model.order.OrderStatus;
 import com.ronnie.airTicket.domain.model.order.PayStatus;
@@ -21,6 +22,7 @@ public class OrderAssembler {
         return new Order(
                 po.getId(),
                 po.getIdFlight(), po.getIdUser(), po.getIdChannel(), po.getCode(),
+                toCabinClass(po.getCabinClass()),
                 po.getTotalPrice(), po.getTotalTax(),
                 PayStatus.valueOf(po.getPayStatus()),
                 OrderStatus.valueOf(po.getOrderStatus()),
@@ -36,6 +38,7 @@ public class OrderAssembler {
         po.setIdUser(order.getUserId());
         po.setIdChannel(order.getChannelId());
         po.setCode(order.getCode());
+        po.setCabinClass(order.getCabinClass().name());
         po.setTotalPrice(order.getTotalPrice());
         po.setTotalTax(order.getTotalTax());
         po.setPayStatus(order.getPayStatus().name());
@@ -46,5 +49,16 @@ public class OrderAssembler {
         po.setRemark(order.getRemark());
         po.setCreateAt(order.getCreateAt());
         return po;
+    }
+
+    /** V3 迁移把既有行默认回填为 'ECONOMY'（非枚举名），统一归一化成 ECONOMY_CLASS。 */
+    private CabinClass toCabinClass(String raw) {
+        if (raw == null || raw.isBlank()) {
+            return CabinClass.ECONOMY_CLASS;
+        }
+        if ("ECONOMY".equals(raw)) {
+            return CabinClass.ECONOMY_CLASS;
+        }
+        return CabinClass.valueOf(raw);
     }
 }

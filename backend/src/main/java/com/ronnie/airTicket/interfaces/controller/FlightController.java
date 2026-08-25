@@ -5,8 +5,10 @@ import com.ronnie.airTicket.application.service.FlightDetailResult;
 import com.ronnie.airTicket.application.service.FlightInsertCommand;
 import com.ronnie.airTicket.application.service.FlightQueryCommand;
 import com.ronnie.airTicket.application.service.FlightUpdateCommand;
+import com.ronnie.airTicket.domain.model.user.UserRole;
 import com.ronnie.airTicket.interfaces.common.ApiResponse;
 import com.ronnie.airTicket.interfaces.common.PageResult;
+import com.ronnie.airTicket.interfaces.common.RequireRole;
 import com.ronnie.airTicket.interfaces.dto.FlightDetailResponse;
 import com.ronnie.airTicket.interfaces.dto.FlightInsertRequest;
 import com.ronnie.airTicket.interfaces.dto.FlightQueryRequest;
@@ -51,36 +53,47 @@ public class FlightController {
         return ApiResponse.ok(flightAppService.search(command).map(FlightQueryResponse::from));
     }
 
+    /** 航班详情：不存在 -> 404。 */
+    @GetMapping("/{id}")
+    public ApiResponse<FlightDetailResponse> detail(@PathVariable Long id) {
+        return ApiResponse.ok(FlightDetailResponse.from(flightAppService.detail(id)));
+    }
+
     // ===== 写 =====
 
-    /** 创建航班：REST 约定新建返回 201。 */
+    /** 创建航班：REST 约定新建返回 201。放票仅商家/管理员。 */
     @PostMapping
     @ResponseStatus(HttpStatus.CREATED)
+    @RequireRole({UserRole.MERCHANT, UserRole.ADMIN})
     public ApiResponse<FlightDetailResponse> insert(@Valid @RequestBody FlightInsertRequest request) {
         FlightInsertCommand command = new FlightInsertCommand(
                 request.idPlane(), request.idAirportDep(), request.idAirportArr(), request.code(),
                 request.datetimeDep(), request.datetimeArr(),
                 request.regionDep(), request.regionArr(), request.distance(),
                 request.seatFirstClass(), request.seatBusinessClass(), request.seatEconomyClass(),
-                request.price(), request.cancellationFee(), request.gate(), request.status());
+                request.price(), request.priceBusinessClass(), request.priceFirstClass(),
+                request.cancellationFee(), request.gate(), request.status());
         FlightDetailResult result = flightAppService.insert(command);
         return ApiResponse.ok(FlightDetailResponse.from(result));
     }
 
-    /** 更新航班：id 走 URL 路径，body 只含可变的运行字段。 */
+    /** 更新航班：id 走 URL 路径，body 只含可变的运行字段。仅商家/管理员。 */
     @PutMapping("/{id}")
+    @RequireRole({UserRole.MERCHANT, UserRole.ADMIN})
     public ApiResponse<FlightDetailResponse> update(@PathVariable Long id,
                                                     @Valid @RequestBody FlightUpdateRequest request) {
         FlightUpdateCommand command = new FlightUpdateCommand(
                 request.datetimeDep(), request.datetimeArr(),
                 request.seatFirstClass(), request.seatBusinessClass(), request.seatEconomyClass(),
-                request.price(), request.cancellationFee(), request.gate(), request.status());
+                request.price(), request.priceBusinessClass(), request.priceFirstClass(),
+                request.cancellationFee(), request.gate(), request.status());
         FlightDetailResult result = flightAppService.update(id, command);
         return ApiResponse.ok(FlightDetailResponse.from(result));
     }
 
-    /** 删除航班：已有订单的航班会返回 400"该航班已有订单，无法删除"。 */
+    /** 删除航班：已有订单的航班会返回 400"该航班已有订单，无法删除"。仅商家/管理员。 */
     @DeleteMapping("/{id}")
+    @RequireRole({UserRole.MERCHANT, UserRole.ADMIN})
     public ApiResponse<Void> delete(@PathVariable Long id) {
         flightAppService.delete(id);
         return ApiResponse.ok(null);

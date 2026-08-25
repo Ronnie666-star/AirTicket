@@ -131,23 +131,41 @@
 
 **备选**：Element Plus 覆盖主题——省事但样式妥协，用户已选手写。
 
+### D10. 账号供给规则（管理员初始化 / 商家管理员分配 / 旅客自助注册）
+
+**方案**：
+- **移除 V2 演示账号**：`V2__seed_sys_user.sql` 改注释占位（不插任何账号），删库重建后系统无用户，必须走初始化。
+- **初始化管理员（`identity/init`）**：`POST /init/admin` 加入 JwtFilter 白名单（`/init`）。`InitAppService.createAdmin` 先 `UserRepository.count()==0` 校验（已有任何用户 → 400），再用 `User.create`（统一校验 + 固定 `ADMIN` 角色、启用）落库。安全模型靠"只允许一次"，不依赖登录。
+- **商家由管理员分配（`identity/admin`）**：`AdminAppService.createMerchant`（复用 `User.create` 校验，固定 `MERCHANT` 角色、启用，初始密码管理员设置）+ `POST /admin/users`（`@RequireRole(ADMIN)`，201）。
+- **`User.create`**：domain 静态工厂，统一校验用户名非空 / 密码哈希非空 / 角色非空 / 真实姓名非空 / 年龄合法 / 邮箱手机至少一个 + 格式；供初始化建管理员、管理员建商家、注册建旅客共用（注册已实现的校验逻辑可逐步收敛到这里，或保持现状不重复抽象）。
+- **渠道自愈**：`DefaultChannelSeeder`（`ApplicationReadyEvent`）在 `channel` 空时插入"官方网站"渠道（`insertIfAbsentByName`，name 唯一索引兜底并发）；`OrderAppService.defaultChannelId()` 改实时查 `ChannelMapper.findByName("官方网站")`（缺省兜底 1L），不再硬编码渠道 id=1。
+
+**为什么**：真实账号供给就是"管理员初始化一次、商家由管理员分配、用户自助注册"；`count()==0` 是零配置、删库即可重置的最小初始化守卫；渠道自愈让删库重建零手工。
+
+**备选**：
+- Flyway 插初始管理员 —— 信息写死 SQL，且"管理员是业务对象"更适合应用层；放弃。
+- 初始化后禁用接口 —— 多一层复杂度，课程项目 `count()==0` 守卫足够；放弃。
+
 ## Risks / Trade-offs
 
 - **[内存支付单重启丢失]** → 启动自愈任务把遗留 PROCESSING 订单回退 UNPAID + 回补余票；残留支付单号失效（可接受，课程演示级）。
 - **[回调端点需令牌防伪造]** → 引入 `X-Channel-Token`（可配），默认值写入文档；若部署到公网需改强，课程环境足够。
-- **[`@RequireRole` 拦截器只覆盖注册路径]** → 注册 `/flight/**`、`/order/**`、`/admin/**`、`/master/**` 全部子路径；新增 controller 若不在这些前缀下需记得注册（在 tasks 里显式列出）。
+- **[`@RequireRole` 拦截器只覆盖注册路径]** → 注册 `/flight/**`、`/order/**`、`/admin/**`、`/master/**` 全部子路径；`/init` 走白名单不走拦截器；新增 controller 若不在这些前缀下需记得注册（在 tasks 里显式列出）。
 - **[User 由全 final 变可变]** → `updateProfile` / `changePassword` 只改可改字段，身份字段（username/role/id）保持 final；不影响并发（改资料/改密码不涉及读-改-写竞争，事务粒度足够）。
 - **[引用删除保护用计数查询]** → 与删除之间仍存在极小并发窗口（删除瞬间新订单引用旧航班）；对课程设计可接受，不引入外键级联。
 - **[账号禁用不踢已登录]** → 与现有 JWT 语义一致（令牌到期才失效），spec 已如此声明。
 - **[DDL 迁移]（`orders.cabin_class` / `flight` 三舱价列）** → V3 为纯增量 ALTER + 默认值，兼容现有空表；回滚只需删列 / `git revert` 迁移文件，风险低。
+- **[V2 移除演示账号]** → 已启动过的库不重跑 V2（Flyway 只跑一次）；删库重建后用初始化端点创建管理员，正好覆盖"删库测试初始化"需求。
+- **[`count()==0` 初始化守卫的竞态]** → 并发同时调 `/init/admin` 时，第二个事务 `count()>0` 抛 400；事务隔离保证不会重复插入管理员。
 - **[前端依赖后端契约]** → 前后端按本套 spec 的字段对齐；联调放在 tasks 末尾，按后端响应结构写前端 API 层。
 - **[confirm / callback 双入口]** → 收敛到同一确认服务方法，状态机一致；孤儿支付单靠启动自愈兜底。
 
 ## Migration Plan
 
 - **数据库（V3，已与用户确认 DDL）**：新增 `V3__add_cabin_class_and_cabin_prices.sql`，纯增量 ALTER —— `orders` 加 `cabin_class VARCHAR(20) NOT NULL DEFAULT 'ECONOMY'`，`flight` 加 `price_business_class` / `price_first_class DECIMAL(10,2) UNSIGNED NOT NULL DEFAULT 0`。先于代码部署。
-- **代码部署**：新增 controller/service/repository/mapper，改 `OrderAppService` / `Order` / `Flight` / `PayStatus` / `OrderDetailResult` / `OrderDetailResponse` / `FlightController` / `OrderController`，新增 `AuthInterceptor` + `@RequireRole` + `ForbiddenException`。
-- **前端部署**：独立 `frontend/`，开发期 Vite dev（代理 `/api` → `:8080`）。
+- **种子变更**：`V2__seed_sys_user.sql` 移除演示账号（改注释占位）。启动自愈补默认渠道；初始化端点建初始管理员。
+- **代码部署**：新增 controller/service/repository/mapper，改 `OrderAppService` / `Order` / `Flight` / `PayStatus` / `OrderDetailResult` / `OrderDetailResponse` / `FlightController` / `OrderController`，新增 `AuthInterceptor` + `@RequireRole` + `ForbiddenException`、`InitController` + `InitAppService`、`DefaultChannelSeeder`、`User.create`。
+- **前端部署**：独立 `frontend/`，开发期 Vite dev（代理 `/api` → `:8080`）；含初始化向导、登录、注册、管理后台创建商家。
 - **回滚**：`git revert` 相关 commit + 删掉 V3 新增列即可，低风险。
 - 启动依赖 `backend/.env` 提供 `JWT_SECRET`（现有）；新增可选 `PAY_CALLBACK_TOKEN`（缺省用默认值）。
 

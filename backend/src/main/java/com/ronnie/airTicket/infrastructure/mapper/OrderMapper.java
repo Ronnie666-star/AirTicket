@@ -49,6 +49,9 @@ public interface OrderMapper {
     /** 某航班下有多少订单：删除航班前做保护性校验。 */
     long countByFlightId(@Param("flightId") Long flightId);
 
+    /** 按支付状态找订单 id（启动自愈回退遗留 PROCESSING 订单用）。 */
+    List<Long> findIdsByPayStatus(@Param("payStatus") String payStatus);
+
     // ===== 写侧：聚合读写（返回/接收 PO）=====
 
     OrderPO findById(@Param("id") Long id);

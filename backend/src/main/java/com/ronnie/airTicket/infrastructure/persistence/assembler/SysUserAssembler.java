@@ -30,4 +30,19 @@ public class SysUserAssembler {
                 po.getCreateAt()
         );
     }
+
+    public SysUserPO toPO(User user) {
+        SysUserPO po = new SysUserPO();
+        po.setId(user.getId());
+        po.setUsername(user.getUsername());
+        po.setPassword(user.getPasswordHash());
+        po.setRealName(user.getRealName());
+        po.setAge(user.getAge());
+        po.setEmail(user.getEmail());
+        po.setPhone(user.getPhone());
+        po.setStatus(user.isEnabled());
+        po.setRole(user.getRole().name());
+        po.setCreateAt(user.getCreateAt());
+        return po;
+    }
 }

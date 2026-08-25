@@ -4,6 +4,17 @@
 
 ## ADDED Requirements
 
+### Requirement: 账号来源规则
+系统账号来源 SHALL 遵循三规则：旅客由自助注册创建（PASSENGER）、商家由管理员分配（MERCHANT）、管理员仅由初始化端点创建（ADMIN）。注册接口固定只产生旅客角色。
+
+#### Scenario: 注册只产生旅客
+- **WHEN** 访客 POST `/register` 成功
+- **THEN** 创建账号角色固定为 `PASSENGER`、启用状态
+
+#### Scenario: 注册不能产生其他角色
+- **WHEN** 访客尝试以任何方式请求注册为商家 / 管理员
+- **THEN** 注册接口不接受角色入参，角色恒为 `PASSENGER`
+
 ### Requirement: 注册账号
 系统 SHALL 提供注册接口 `POST /register`，访客无需登录即可注册（加入鉴权白名单）。注册需提供用户名、密码、真实姓名、年龄、邮箱、手机号；邮箱与手机号至少填一个。默认角色为旅客（PASSENGER）、账号默认启用。注册成功返回 201 与用户基本信息，不自动登录（前端引导去登录页）。
 

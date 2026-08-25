@@ -1,0 +1,46 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.ronnie.airTicket.infrastructure.mapper.PassengerMapper">
+
+    <!-- useGeneratedKeys：把自增主键回填到 po.id；create_at 不写，交给 DEFAULT CURRENT_TIMESTAMP -->
+    <insert id="insert" useGeneratedKeys="true" keyProperty="id">
+        INSERT INTO passenger (user_id, passenger_id)
+        VALUES (#{userId}, #{passengerId})
+    </insert>
+
+    <delete id="deleteById">
+        DELETE FROM passenger WHERE id = #{id}
+    </delete>
+
+    <!-- JOIN sys_user 拿乘机人姓名/用户名（展示用） -->
+    <select id="selectByUserId" resultType="com.ronnie.airTicket.infrastructure.persistence.query.PassengerQO">
+        SELECT p.id,
+               p.user_id,
+               p.passenger_id,
+               u.real_name,
+               u.username,
+               p.create_at
+        FROM passenger p
+        JOIN sys_user u ON p.passenger_id = u.id
+        WHERE p.user_id = #{userId}
+        ORDER BY p.id DESC
+    </select>
+
+    <select id="selectById" resultType="com.ronnie.airTicket.infrastructure.persistence.query.PassengerQO">
+        SELECT p.id,
+               p.user_id,
+               p.passenger_id,
+               u.real_name,
+               u.username,
+               p.create_at
+        FROM passenger p
+        JOIN sys_user u ON p.passenger_id = u.id
+        WHERE p.id = #{id}
+    </select>
+
+    <!-- 重复添加预判：同 (user_id, passenger_id) 已存在 -->
+    <select id="countByUserIdAndPassengerId" resultType="int">
+        SELECT COUNT(*) FROM passenger WHERE user_id = #{userId} AND passenger_id = #{passengerId}
+    </select>
+
+</mapper>

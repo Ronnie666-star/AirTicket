@@ -48,6 +48,7 @@
                o.id_user,
                o.id_channel,
                o.code,
+               o.cabin_class,
                o.total_price,
                o.total_tax,
                o.pay_status,
@@ -78,10 +79,15 @@
         SELECT COUNT(*) FROM orders WHERE id_flight = #{flightId}
     </select>
 
+    <!-- 启动自愈用：找所有处于"支付中"的订单 id -->
+    <select id="findIdsByPayStatus" resultType="java.lang.Long">
+        SELECT id FROM orders WHERE pay_status = #{payStatus}
+    </select>
+
     <!-- ===== 写侧：聚合读写 ===== -->
 
     <select id="findById" resultType="OrderPO">
-        SELECT id, id_flight, id_user, id_channel, code, total_price, total_tax,
+        SELECT id, id_flight, id_user, id_channel, code, cabin_class, total_price, total_tax,
                pay_status, order_status, pay_time, issue_time, cancel_time, remark, create_at
         FROM orders
         WHERE id = #{id}
@@ -89,7 +95,7 @@
 
     <!-- 写路径加锁读：FOR UPDATE 给这一行上排他锁，事务提交才释放。调用方必须在 @Transactional 里用。 -->
     <select id="findByIdForUpdate" resultType="OrderPO">
-        SELECT id, id_flight, id_user, id_channel, code, total_price, total_tax,
+        SELECT id, id_flight, id_user, id_channel, code, cabin_class, total_price, total_tax,
                pay_status, order_status, pay_time, issue_time, cancel_time, remark, create_at
         FROM orders
         WHERE id = #{id}
@@ -98,9 +104,9 @@
 
     <!-- useGeneratedKeys：把自增主键回填到 po.id；create_at 不写，交给 DEFAULT CURRENT_TIMESTAMP -->
     <insert id="insert" useGeneratedKeys="true" keyProperty="id">
-        INSERT INTO orders (id_flight, id_user, id_channel, code, total_price, total_tax,
+        INSERT INTO orders (id_flight, id_user, id_channel, code, cabin_class, total_price, total_tax,
                             pay_status, order_status, pay_time, issue_time, cancel_time, remark)
-        VALUES (#{idFlight}, #{idUser}, #{idChannel}, #{code}, #{totalPrice}, #{totalTax},
+        VALUES (#{idFlight}, #{idUser}, #{idChannel}, #{code}, #{cabinClass}, #{totalPrice}, #{totalTax},
                 #{payStatus}, #{orderStatus}, #{payTime}, #{issueTime}, #{cancelTime}, #{remark})
     </insert>
 
@@ -111,6 +117,7 @@
             id_user = #{idUser},
             id_channel = #{idChannel},
             code = #{code},
+            cabin_class = #{cabinClass},
             total_price = #{totalPrice},
             total_tax = #{totalTax},
             pay_status = #{payStatus},

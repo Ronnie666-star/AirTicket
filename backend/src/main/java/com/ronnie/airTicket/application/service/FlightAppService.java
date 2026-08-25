@@ -48,8 +48,18 @@ public class FlightAppService {
         return new FlightQueryResult(
                 qo.getId(), qo.getCode(), qo.getDatetimeDep(), qo.getDatetimeArr(),
                 qo.getRegionDep(), qo.getRegionArr(), qo.getGate(),
-                qo.getDistance(), qo.getPrice(), qo.getStatus()
+                qo.getDistance(), qo.getPrice(), qo.getPriceBusinessClass(), qo.getPriceFirstClass(),
+                qo.getStatus()
         );
+    }
+
+    // ===== 详情（读侧） =====
+
+    /** 航班详情：按 id 取完整航班信息，不存在 -> 404。 */
+    public FlightDetailResult detail(Long id) {
+        Flight flight = flightRepository.findById(id)
+                .orElseThrow(() -> new FlightNotFoundException(id));
+        return FlightDetailResult.from(flight);
     }
 
     // ===== 写侧：走 Repository =====
@@ -63,7 +73,8 @@ public class FlightAppService {
                 cmd.datetimeDep(), cmd.datetimeArr(),
                 cmd.regionDep(), cmd.regionArr(), cmd.distance(),
                 cmd.seatFirstClass(), cmd.seatBusinessClass(), cmd.seatEconomyClass(),
-                cmd.price(), cmd.cancellationFee(), cmd.gate(), cmd.status(),
+                cmd.price(), cmd.priceBusinessClass(), cmd.priceFirstClass(),
+                cmd.cancellationFee(), cmd.gate(), cmd.status(),
                 null
         );
         flightRepository.save(flight);   // 内部发现 id==null → INSERT，主键回填
@@ -82,7 +93,8 @@ public class FlightAppService {
         flight.update(
                 cmd.datetimeDep(), cmd.datetimeArr(),
                 cmd.seatFirstClass(), cmd.seatBusinessClass(), cmd.seatEconomyClass(),
-                cmd.price(), cmd.cancellationFee(), cmd.gate(), cmd.status()
+                cmd.price(), cmd.priceBusinessClass(), cmd.priceFirstClass(),
+                cmd.cancellationFee(), cmd.gate(), cmd.status()
         );
         if (!flightRepository.save(flight)) {   // 0 行 = 锁后已被并发删除
             throw new FlightNotFoundException(id);

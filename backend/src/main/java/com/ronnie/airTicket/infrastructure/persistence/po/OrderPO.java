@@ -18,6 +18,7 @@ public class OrderPO {
     private Long idUser;
     private Long idChannel;
     private String code;
+    private String cabinClass;
     private BigDecimal totalPrice;
     private BigDecimal totalTax;
     private String payStatus;

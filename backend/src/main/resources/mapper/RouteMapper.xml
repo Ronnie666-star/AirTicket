@@ -1,0 +1,13 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.ronnie.airTicket.infrastructure.mapper.RouteMapper">
+
+    <!-- 每趟航班一条轨迹（idx_route_flight 唯一索引），未查到返回 null -->
+    <select id="findByFlightId" resultType="com.ronnie.airTicket.infrastructure.persistence.query.RouteQO">
+        SELECT id, id_flight, distance_remain, time_remain, altitude, speed,
+               latitude, longitude, time_stamp, create_at
+        FROM route
+        WHERE id_flight = #{flightId}
+    </select>
+
+</mapper>

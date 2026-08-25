@@ -22,5 +22,7 @@ public class FlightSearchQO {
     private String gate;
     private Integer distance;
     private BigDecimal price;
+    private BigDecimal priceBusinessClass;
+    private BigDecimal priceFirstClass;
     private String status;
 }

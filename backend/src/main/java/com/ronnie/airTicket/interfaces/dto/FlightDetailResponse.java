@@ -21,6 +21,8 @@ public record FlightDetailResponse(
         Integer seatBusinessClass,
         Integer seatEconomyClass,
         BigDecimal price,
+        BigDecimal priceBusinessClass,
+        BigDecimal priceFirstClass,
         BigDecimal cancellationFee,
         String gate,
         String status
@@ -32,7 +34,8 @@ public record FlightDetailResponse(
                 result.datetimeDep(), result.datetimeArr(),
                 result.regionDep(), result.regionArr(), result.distance(),
                 result.seatFirstClass(), result.seatBusinessClass(), result.seatEconomyClass(),
-                result.price(), result.cancellationFee(), result.gate(), result.status()
+                result.price(), result.priceBusinessClass(), result.priceFirstClass(),
+                result.cancellationFee(), result.gate(), result.status()
         );
     }
 }

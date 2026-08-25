@@ -1,0 +1,31 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.ronnie.airTicket.infrastructure.mapper.AirlineMapper">
+
+    <select id="list" resultType="AirlinePO">
+        SELECT id, name, create_at FROM airline ORDER BY id
+    </select>
+
+    <select id="findById" resultType="AirlinePO">
+        SELECT id, name, create_at FROM airline WHERE id = #{id}
+    </select>
+
+    <!-- useGeneratedKeys：回填自增主键；create_at 交给 DEFAULT CURRENT_TIMESTAMP -->
+    <insert id="insert" useGeneratedKeys="true" keyProperty="id">
+        INSERT INTO airline (name) VALUES (#{name})
+    </insert>
+
+    <update id="update">
+        UPDATE airline SET name = #{name} WHERE id = #{id}
+    </update>
+
+    <delete id="delete">
+        DELETE FROM airline WHERE id = #{id}
+    </delete>
+
+    <!-- 删除前引用保护：该航司下有多少机型 -->
+    <select id="countByAirlineId" resultType="long">
+        SELECT COUNT(*) FROM plane WHERE id_airline = #{airlineId}
+    </select>
+
+</mapper>

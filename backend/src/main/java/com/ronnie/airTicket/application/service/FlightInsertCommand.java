@@ -18,6 +18,8 @@ public record FlightInsertCommand(
         Integer seatBusinessClass,
         Integer seatEconomyClass,
         BigDecimal price,
+        BigDecimal priceBusinessClass,
+        BigDecimal priceFirstClass,
         BigDecimal cancellationFee,
         String gate,
         String status

@@ -39,7 +39,10 @@ public class JwtFilter extends OncePerRequestFilter {
     private static final String BEARER_PREFIX = "Bearer ";
 
     /** 无需登录即可访问的路径（按前缀匹配） */
-    private static final List<String> WHITE_LIST = List.of("/login", "/actuator/health");
+    private static final List<String> WHITE_LIST = List.of(
+            "/login", "/register", "/init", "/actuator/health",
+            "/pay/callback"   // 模拟第三方渠道回调：凭 X-Channel-Token 鉴权，不校验登录
+    );
 
     private final TokenProvider tokenProvider;
     private final ObjectMapper objectMapper;

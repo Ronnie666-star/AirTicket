@@ -1,0 +1,59 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.ronnie.airTicket.infrastructure.mapper.SysUserMapper">
+
+    <select id="findByUsername" resultType="SysUserPO">
+        SELECT id, username, password, real_name, age, email, phone, status, role, create_at
+        FROM sys_user
+        WHERE username = #{username}
+    </select>
+
+    <select id="findById" resultType="SysUserPO">
+        SELECT id, username, password, real_name, age, email, phone, status, role, create_at
+        FROM sys_user
+        WHERE id = #{id}
+    </select>
+
+    <select id="count" resultType="long">
+        SELECT COUNT(*) FROM sys_user
+    </select>
+
+    <!-- useGeneratedKeys：把自增主键回填到 po.id；create_at 不写，交给 DEFAULT CURRENT_TIMESTAMP -->
+    <insert id="insert" useGeneratedKeys="true" keyProperty="id">
+        INSERT INTO sys_user (username, password, real_name, age, email, phone, status, role)
+        VALUES (#{username}, #{password}, #{realName}, #{age}, #{email}, #{phone}, #{status}, #{role})
+    </insert>
+
+    <!-- 全字段更新；username / role 身份字段写回原值，只有可变字段被领域层改过 -->
+    <update id="update">
+        UPDATE sys_user
+        SET username = #{username},
+            password = #{password},
+            real_name = #{realName},
+            age = #{age},
+            email = #{email},
+            phone = #{phone},
+            status = #{status},
+            role = #{role}
+        WHERE id = #{id}
+    </update>
+
+    <!-- 用户列表（管理员）：动态筛选，username 模糊 / role 精确 / enabled 精确 -->
+    <select id="search" resultType="SysUserPO">
+        SELECT id, username, password, real_name, age, email, phone, status, role, create_at
+        FROM sys_user
+        <where>
+            <if test="username != null and username != ''">
+                AND username LIKE CONCAT('%', #{username}, '%')
+            </if>
+            <if test="role != null and role != ''">
+                AND role = #{role}
+            </if>
+            <if test="enabled != null">
+                AND status = #{enabled}
+            </if>
+        </where>
+        ORDER BY id
+    </select>
+
+</mapper>

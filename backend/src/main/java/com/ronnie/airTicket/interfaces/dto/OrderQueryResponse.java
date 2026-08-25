@@ -15,6 +15,7 @@ public record OrderQueryResponse(
         Long userId,
         Long channelId,
         String code,
+        String cabinClass,
         BigDecimal totalPrice,
         BigDecimal totalTax,
         String payStatus,
@@ -33,6 +34,7 @@ public record OrderQueryResponse(
         return new OrderQueryResponse(
                 result.id(),
                 result.flightId(), result.userId(), result.channelId(), result.code(),
+                result.cabinClass(),
                 result.totalPrice(), result.totalTax(),
                 result.payStatus(), result.orderStatus(),
                 result.payTime(), result.issueTime(), result.cancelTime(),

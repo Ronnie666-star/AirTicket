@@ -1,0 +1,37 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.ronnie.airTicket.infrastructure.mapper.AirportMapper">
+
+    <!-- region 可空：为空返回全部 -->
+    <select id="list" resultType="AirportPO">
+        SELECT id, name, region, create_at FROM airport
+        <where>
+            <if test="region != null and region != ''">
+                AND region = #{region}
+            </if>
+        </where>
+        ORDER BY id
+    </select>
+
+    <select id="findById" resultType="AirportPO">
+        SELECT id, name, region, create_at FROM airport WHERE id = #{id}
+    </select>
+
+    <insert id="insert" useGeneratedKeys="true" keyProperty="id">
+        INSERT INTO airport (name, region) VALUES (#{name}, #{region})
+    </insert>
+
+    <update id="update">
+        UPDATE airport SET name = #{name}, region = #{region} WHERE id = #{id}
+    </update>
+
+    <delete id="delete">
+        DELETE FROM airport WHERE id = #{id}
+    </delete>
+
+    <!-- 删除前引用保护：该机场被多少航班引用（出发或到达） -->
+    <select id="countByAirportId" resultType="long">
+        SELECT COUNT(*) FROM flight WHERE id_airport_dep = #{airportId} OR id_airport_arr = #{airportId}
+    </select>
+
+</mapper>

@@ -48,8 +48,15 @@ jwt:
   # 密钥 / 有效期都来自环境变量：本地由 spring-dotenv 读取 backend/.env，
   # Docker 由 compose 的 env_file 或 docker run --env-file 注入同名变量。
   # 密钥长度必须 >= 32 字节，否则 HS256 验签会抛 WeakKeyException。
-  secret: ${JWT_SECRET}
+  # 带默认值兜底：从 IDEA 等以项目根为工作目录启动时读不到 backend/.env 也能起来（.env 仍优先）。
+  secret: ${JWT_SECRET:airTicket-please-change-this-secret-key-0123456789}
   expire-hours: ${JWT_EXPIRE_HOURS:24}
+
+# ===== 模拟支付渠道：回调端点（POST /pay/callback）的鉴权令牌 =====
+# 由 env PAY_CALLBACK_TOKEN 注入；缺省用演示默认值（课程环境足够，公网需改强）。
+pay:
+  channel:
+    callback-token: ${PAY_CALLBACK_TOKEN:channel-simulate-secret}
 
 # ===== spring-dotenv：本地启动时把 backend/.env 注入 Spring 环境 =====
 springdotenv:

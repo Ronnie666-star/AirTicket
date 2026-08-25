@@ -2,7 +2,9 @@ package com.ronnie.airTicket.interfaces.common;
 
 import com.ronnie.airTicket.domain.exception.AuthenticationException;
 import com.ronnie.airTicket.domain.exception.DomainException;
+import com.ronnie.airTicket.domain.exception.ForbiddenException;
 import com.ronnie.airTicket.domain.exception.ResourceNotFoundException;
+import com.ronnie.airTicket.domain.exception.UsernameTakenException;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.dao.DuplicateKeyException;
 import org.springframework.http.HttpStatus;
@@ -39,6 +41,13 @@ public class GlobalExceptionHandler {
         return ApiResponse.error(401, e.getMessage());
     }
 
+    /** 无权限：角色不匹配 / 操作他人订单 -> 403 */
+    @ExceptionHandler(ForbiddenException.class)
+    @ResponseStatus(HttpStatus.FORBIDDEN)
+    public ApiResponse<Void> handleForbidden(ForbiddenException e) {
+        return ApiResponse.error(403, e.getMessage());
+    }
+
     /** 资源不存在：改/删一个不存在的航班、订单 -> 404，而不是 400 */
     @ExceptionHandler(ResourceNotFoundException.class)
     @ResponseStatus(HttpStatus.NOT_FOUND)
@@ -61,6 +70,13 @@ public class GlobalExceptionHandler {
     @ResponseStatus(HttpStatus.CONFLICT)
     public ApiResponse<Void> handleDuplicateKey(DuplicateKeyException e) {
         return ApiResponse.error(409, "数据已存在，请勿重复提交");
+    }
+
+    /** 用户名已占用（注册预判）-> 409，文案比通用唯一冲突更明确 */
+    @ExceptionHandler(UsernameTakenException.class)
+    @ResponseStatus(HttpStatus.CONFLICT)
+    public ApiResponse<Void> handleUsernameTaken(UsernameTakenException e) {
+        return ApiResponse.error(409, e.getMessage());
     }
 
     /** 路径不存在：Spring 6.1 对未映射路径抛 NoResourceFoundException，这里转成 404 而不是 500 */

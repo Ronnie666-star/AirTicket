@@ -26,6 +26,8 @@ public class FlightPO {
     private Integer seatBusinessClass;
     private Integer seatEconomyClass;
     private BigDecimal price;
+    private BigDecimal priceBusinessClass;
+    private BigDecimal priceFirstClass;
     private BigDecimal cancellationFee;
     private String gate;
     private String status;

@@ -51,6 +51,8 @@
                f.gate,
                f.distance,
                f.price,
+               f.price_business_class,
+               f.price_first_class,
                f.status
         <include refid="searchFrom"/>
         <include refid="searchConditions"/>
@@ -69,7 +71,7 @@
     <select id="findById" resultType="FlightPO">
         SELECT id, id_plane, id_airport_dep, id_airport_arr, code, datetime_dep, datetime_arr,
                region_dep, region_arr, distance, seat_first_class, seat_business_class, seat_economy_class,
-               price, cancellation_fee, gate, status, create_at
+               price, price_business_class, price_first_class, cancellation_fee, gate, status, create_at
         FROM flight
         WHERE id = #{id}
     </select>
@@ -79,7 +81,7 @@
     <select id="findByIdForUpdate" resultType="FlightPO">
         SELECT id, id_plane, id_airport_dep, id_airport_arr, code, datetime_dep, datetime_arr,
                region_dep, region_arr, distance, seat_first_class, seat_business_class, seat_economy_class,
-               price, cancellation_fee, gate, status, create_at
+               price, price_business_class, price_first_class, cancellation_fee, gate, status, create_at
         FROM flight
         WHERE id = #{id}
         FOR UPDATE
@@ -94,10 +96,12 @@
     <insert id="insert" useGeneratedKeys="true" keyProperty="id">
         INSERT INTO flight (id_plane, id_airport_dep, id_airport_arr, code, datetime_dep, datetime_arr,
                             region_dep, region_arr, distance, seat_first_class, seat_business_class,
-                            seat_economy_class, price, cancellation_fee, gate, status)
+                            seat_economy_class, price, price_business_class, price_first_class,
+                            cancellation_fee, gate, status)
         VALUES (#{idPlane}, #{idAirportDep}, #{idAirportArr}, #{code}, #{datetimeDep}, #{datetimeArr},
                 #{regionDep}, #{regionArr}, #{distance}, #{seatFirstClass}, #{seatBusinessClass},
-                #{seatEconomyClass}, #{price}, #{cancellationFee}, #{gate}, #{status})
+                #{seatEconomyClass}, #{price}, #{priceBusinessClass}, #{priceFirstClass},
+                #{cancellationFee}, #{gate}, #{status})
     </insert>
 
     <!-- 全字段更新；唯一性由 (code, datetime_dep) 唯一索引兜底，撞了抛 DuplicateKeyException -->
@@ -116,6 +120,8 @@
             seat_business_class = #{seatBusinessClass},
             seat_economy_class = #{seatEconomyClass},
             price = #{price},
+            price_business_class = #{priceBusinessClass},
+            price_first_class = #{priceFirstClass},
             cancellation_fee = #{cancellationFee},
             gate = #{gate},
             status = #{status}

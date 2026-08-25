@@ -16,6 +16,8 @@ public record FlightQueryResponse(
         String gate,
         Integer distance,
         BigDecimal price,
+        BigDecimal priceBusinessClass,
+        BigDecimal priceFirstClass,
         String status
 ) {
     public static FlightQueryResponse from(FlightQueryResult result) {
@@ -29,6 +31,8 @@ public record FlightQueryResponse(
                 result.gate(),
                 result.distance(),
                 result.price(),
+                result.priceBusinessClass(),
+                result.priceFirstClass(),
                 result.status()
         );
     }
