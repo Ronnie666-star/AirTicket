@@ -2,6 +2,7 @@ package com.ronnie.airTicket.interfaces.common;
 
 import com.ronnie.airTicket.domain.exception.AuthenticationException;
 import com.ronnie.airTicket.domain.exception.DomainException;
+import com.ronnie.airTicket.domain.exception.ResourceNotFoundException;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.dao.DuplicateKeyException;
 import org.springframework.http.HttpStatus;
@@ -13,8 +14,12 @@ import org.springframework.web.servlet.resource.NoResourceFoundException;
 
 /**
  * 全局异常处理：把异常翻译成统一 HTTP 响应。
- * 领域异常（DomainException）在这里转成 400 + 业务消息；
- * 参数校验异常转成 400 + 具体字段错误；其余兜底 500。
+ *   业务规则违规（DomainException）        -> 400
+ *   登录认证失败（AuthenticationException）-> 401
+ *   资源不存在（ResourceNotFoundException）-> 404
+ *   唯一约束冲突（DuplicateKeyException）  -> 409
+ *   参数校验异常（MethodArgumentNotValid） -> 400
+ *   其余兜底                               -> 500
  * 异常处理是接口层的职责，domain 里没有任何 HTTP/Spring 概念。
  */
 @Slf4j
@@ -27,11 +32,18 @@ public class GlobalExceptionHandler {
         return ApiResponse.error(400, e.getMessage());
     }
 
-    /** 登录认证失败（用户不存在 / 密码错误 / 账号禁用）统一 401 */
+    /** 登录认证失败（用户不存在 / 密码错误 / 账号禁用 / 尝试次数过多）统一 401 */
     @ExceptionHandler(AuthenticationException.class)
     @ResponseStatus(HttpStatus.UNAUTHORIZED)
     public ApiResponse<Void> handleAuth(AuthenticationException e) {
         return ApiResponse.error(401, e.getMessage());
+    }
+
+    /** 资源不存在：改/删一个不存在的航班、订单 -> 404，而不是 400 */
+    @ExceptionHandler(ResourceNotFoundException.class)
+    @ResponseStatus(HttpStatus.NOT_FOUND)
+    public ApiResponse<Void> handleResourceNotFound(ResourceNotFoundException e) {
+        return ApiResponse.error(404, e.getMessage());
     }
 
     @ExceptionHandler(MethodArgumentNotValidException.class)
@@ -44,11 +56,11 @@ public class GlobalExceptionHandler {
         return ApiResponse.error(400, msg);
     }
 
-    /** 唯一约束冲突：flight(code, datetime_dep) 等由数据库唯一索引兜底的重复提交，转成 400 而不是 500 */
+    /** 唯一约束冲突：重复提交（同航班号同出发时间、订单号撞号等）-> 409 Conflict */
     @ExceptionHandler(DuplicateKeyException.class)
-    @ResponseStatus(HttpStatus.BAD_REQUEST)
+    @ResponseStatus(HttpStatus.CONFLICT)
     public ApiResponse<Void> handleDuplicateKey(DuplicateKeyException e) {
-        return ApiResponse.error(400, "数据已存在，请勿重复提交");
+        return ApiResponse.error(409, "数据已存在，请勿重复提交");
     }
 
     /** 路径不存在：Spring 6.1 对未映射路径抛 NoResourceFoundException，这里转成 404 而不是 500 */

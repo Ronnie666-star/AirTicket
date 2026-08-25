@@ -1,0 +1,125 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.ronnie.airTicket.infrastructure.mapper.OrderMapper">
+
+    <!-- ===== 读侧：我的订单列表（动态 SQL，WHERE 片段供 select / count 复用）===== -->
+
+    <sql id="searchFrom">
+        FROM orders o
+        JOIN flight f ON o.id_flight = f.id
+        LEFT JOIN plane p ON f.id_plane = p.id
+        LEFT JOIN airline a ON p.id_airline = a.id
+    </sql>
+
+    <sql id="searchConditions">
+        <where>
+            <!-- "只能查自己的订单"：id_user 恒成立条件，用户 ID 来自 JWT，不由调用方传 -->
+            AND o.id_user = #{userId}
+            <if test="code != null and code != ''">
+                AND o.code = #{code}
+            </if>
+            <if test="payStatus != null and payStatus != ''">
+                AND o.pay_status = #{payStatus}
+            </if>
+            <if test="orderStatus != null and orderStatus != ''">
+                AND o.order_status = #{orderStatus}
+            </if>
+            <if test="createAtEarliest != null">
+                AND o.create_at &gt;= #{createAtEarliest}
+            </if>
+            <if test="createAtLatest != null">
+                AND o.create_at &lt;= #{createAtLatest}
+            </if>
+            <if test="regionDep != null and regionDep != ''">
+                AND f.region_dep = #{regionDep}
+            </if>
+            <if test="regionArr != null and regionArr != ''">
+                AND f.region_arr = #{regionArr}
+            </if>
+            <if test="airlineName != null and airlineName != ''">
+                AND a.name = #{airlineName}
+            </if>
+        </where>
+    </sql>
+
+    <select id="search" resultType="com.ronnie.airTicket.infrastructure.persistence.query.OrderSearchQO">
+        SELECT o.id,
+               o.id_flight,
+               o.id_user,
+               o.id_channel,
+               o.code,
+               o.total_price,
+               o.total_tax,
+               o.pay_status,
+               o.order_status,
+               o.pay_time,
+               o.issue_time,
+               o.cancel_time,
+               o.remark,
+               o.create_at,
+               f.code AS flight_code,
+               f.region_dep,
+               f.region_arr,
+               a.name AS airline_name
+        <include refid="searchFrom"/>
+        <include refid="searchConditions"/>
+        ORDER BY o.create_at DESC, o.id DESC
+        LIMIT #{offset}, #{size}
+    </select>
+
+    <select id="countSearch" resultType="long">
+        SELECT COUNT(*)
+        <include refid="searchFrom"/>
+        <include refid="searchConditions"/>
+    </select>
+
+    <!-- 删除航班前的保护性校验：这趟航班下有多少订单 -->
+    <select id="countByFlightId" resultType="long">
+        SELECT COUNT(*) FROM orders WHERE id_flight = #{flightId}
+    </select>
+
+    <!-- ===== 写侧：聚合读写 ===== -->
+
+    <select id="findById" resultType="OrderPO">
+        SELECT id, id_flight, id_user, id_channel, code, total_price, total_tax,
+               pay_status, order_status, pay_time, issue_time, cancel_time, remark, create_at
+        FROM orders
+        WHERE id = #{id}
+    </select>
+
+    <!-- 写路径加锁读：FOR UPDATE 给这一行上排他锁，事务提交才释放。调用方必须在 @Transactional 里用。 -->
+    <select id="findByIdForUpdate" resultType="OrderPO">
+        SELECT id, id_flight, id_user, id_channel, code, total_price, total_tax,
+               pay_status, order_status, pay_time, issue_time, cancel_time, remark, create_at
+        FROM orders
+        WHERE id = #{id}
+        FOR UPDATE
+    </select>
+
+    <!-- useGeneratedKeys：把自增主键回填到 po.id；create_at 不写，交给 DEFAULT CURRENT_TIMESTAMP -->
+    <insert id="insert" useGeneratedKeys="true" keyProperty="id">
+        INSERT INTO orders (id_flight, id_user, id_channel, code, total_price, total_tax,
+                            pay_status, order_status, pay_time, issue_time, cancel_time, remark)
+        VALUES (#{idFlight}, #{idUser}, #{idChannel}, #{code}, #{totalPrice}, #{totalTax},
+                #{payStatus}, #{orderStatus}, #{payTime}, #{issueTime}, #{cancelTime}, #{remark})
+    </insert>
+
+    <!-- 全字段更新；订单号 code 唯一索引兜底，撞了抛 DuplicateKeyException -->
+    <update id="update">
+        UPDATE orders
+        SET id_flight = #{idFlight},
+            id_user = #{idUser},
+            id_channel = #{idChannel},
+            code = #{code},
+            total_price = #{totalPrice},
+            total_tax = #{totalTax},
+            pay_status = #{payStatus},
+            order_status = #{orderStatus},
+            pay_time = #{payTime},
+            issue_time = #{issueTime},
+            cancel_time = #{cancelTime},
+            remark = #{remark}
+        WHERE id = #{id}
+    </update>
+
+</mapper>

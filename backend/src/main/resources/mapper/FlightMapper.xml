@@ -2,29 +2,18 @@
 <!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
 <mapper namespace="com.ronnie.airTicket.infrastructure.mapper.FlightMapper">
 
-    <!-- ===== 读侧：航班搜索（动态 SQL）===== -->
+    <!-- ===== 读侧：航班搜索（动态 SQL，WHERE 片段供 select / count 复用）===== -->
 
-    <!--
-        航班搜索：所有筛选条件都可空，传了才进 WHERE；只有按机场名筛才 JOIN airport。
-        起落地"城市"就是 flight 表自带的 region_dep / region_arr，大部分查询单表就够了。
-    -->
-    <select id="search" resultType="com.ronnie.airTicket.infrastructure.persistence.query.FlightSearchQO">
-        SELECT f.id,
-               f.code,
-               f.datetime_dep,
-               f.datetime_arr,
-               f.region_dep,
-               f.region_arr,
-               f.gate,
-               f.distance,
-               f.price,
-               f.status
+    <!-- 只有按机场全名筛（airport.name）才需要 join，否则不 join -->
+    <sql id="searchFrom">
         FROM flight f
-        <!-- 只有按机场全名筛（airport.name）才需要 join，否则不 join -->
         <if test="airportName != null and airportName != ''">
             JOIN airport ad ON f.id_airport_dep = ad.id
             JOIN airport ar ON f.id_airport_arr = ar.id
         </if>
+    </sql>
+
+    <sql id="searchConditions">
         <where>
             <if test="depCity != null and depCity != ''">
                 AND f.region_dep = #{depCity}
@@ -50,7 +39,29 @@
                 AND (ad.name = #{airportName} OR ar.name = #{airportName})
             </if>
         </where>
-        ORDER BY f.datetime_dep
+    </sql>
+
+    <select id="search" resultType="com.ronnie.airTicket.infrastructure.persistence.query.FlightSearchQO">
+        SELECT f.id,
+               f.code,
+               f.datetime_dep,
+               f.datetime_arr,
+               f.region_dep,
+               f.region_arr,
+               f.gate,
+               f.distance,
+               f.price,
+               f.status
+        <include refid="searchFrom"/>
+        <include refid="searchConditions"/>
+        ORDER BY f.datetime_dep, f.id
+        LIMIT #{offset}, #{size}
+    </select>
+
+    <select id="countSearch" resultType="long">
+        SELECT COUNT(*)
+        <include refid="searchFrom"/>
+        <include refid="searchConditions"/>
     </select>
 
     <!-- ===== 写侧：聚合读写 ===== -->
@@ -72,6 +83,11 @@
         FROM flight
         WHERE id = #{id}
         FOR UPDATE
+    </select>
+
+    <!-- 改签校验同航司用：机型 -> 航司 -->
+    <select id="findAirlineIdByPlaneId" resultType="java.lang.Long">
+        SELECT id_airline FROM plane WHERE id = #{planeId}
     </select>
 
     <!-- useGeneratedKeys：把自增主键回填到 po.id；create_at 不写，交给 DEFAULT CURRENT_TIMESTAMP -->
@@ -105,5 +121,9 @@
             status = #{status}
         WHERE id = #{id}
     </update>
+
+    <delete id="delete">
+        DELETE FROM flight WHERE id = #{id}
+    </delete>
 
 </mapper>

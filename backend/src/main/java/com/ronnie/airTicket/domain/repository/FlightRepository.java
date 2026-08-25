@@ -5,7 +5,7 @@ import com.ronnie.airTicket.domain.model.flight.Flight;
 import java.util.Optional;
 
 /**
- * 航班仓储端口（Port）。domain 层只声明"我要按 id 拿航班 / 存航班"，
+ * 航班仓储端口（Port）。domain 层只声明"我要按 id 拿航班 / 存航班 / 删航班"，
  * MyBatis 怎么查怎么写是基础设施层的事 —— 依赖倒置让领域逻辑不依赖数据库。
  */
 public interface FlightRepository {
@@ -21,4 +21,7 @@ public interface FlightRepository {
      * @return 是否真正改了行。update 没碰到任何行（0 行，锁后已被并发删除）返回 false。
      */
     boolean save(Flight flight);
+
+    /** 按 id 删除聚合。@return 是否真正删了行（0 行 = 已被并发删除）。 */
+    boolean deleteById(Long id);
 }

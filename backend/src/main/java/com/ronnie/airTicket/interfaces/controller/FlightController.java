@@ -4,9 +4,9 @@ import com.ronnie.airTicket.application.service.FlightAppService;
 import com.ronnie.airTicket.application.service.FlightDetailResult;
 import com.ronnie.airTicket.application.service.FlightInsertCommand;
 import com.ronnie.airTicket.application.service.FlightQueryCommand;
-import com.ronnie.airTicket.application.service.FlightQueryResult;
 import com.ronnie.airTicket.application.service.FlightUpdateCommand;
 import com.ronnie.airTicket.interfaces.common.ApiResponse;
+import com.ronnie.airTicket.interfaces.common.PageResult;
 import com.ronnie.airTicket.interfaces.dto.FlightDetailResponse;
 import com.ronnie.airTicket.interfaces.dto.FlightInsertRequest;
 import com.ronnie.airTicket.interfaces.dto.FlightQueryRequest;
@@ -15,6 +15,7 @@ import com.ronnie.airTicket.interfaces.dto.FlightUpdateRequest;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
+import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.ModelAttribute;
 import org.springframework.web.bind.annotation.PathVariable;
@@ -25,13 +26,12 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.ResponseStatus;
 import org.springframework.web.bind.annotation.RestController;
 
-import java.util.List;
-
 /**
  * 航班接口：薄，只做"请求体/查询参数 -> 命令 -> 调用例 -> 组装响应"，业务全在应用/领域层。
- *   GET  /flight            搜航班（读）
- *   POST /flight            创建航班（写，返回 201）
- *   PUT  /flight/{id}       更新航班运行字段（写）
+ *   GET    /flight          搜航班（读，分页）
+ *   POST   /flight          创建航班（写，返回 201）
+ *   PUT    /flight/{id}     更新航班运行字段（写）
+ *   DELETE /flight/{id}     删除航班（写，已有订单的航班拒绝删除）
  */
 @RequiredArgsConstructor
 @RestController
@@ -43,12 +43,12 @@ public class FlightController {
     // ===== 读 =====
 
     @GetMapping
-    public ApiResponse<List<FlightQueryResponse>> search(@ModelAttribute FlightQueryRequest request) {
+    public ApiResponse<PageResult<FlightQueryResponse>> search(@ModelAttribute FlightQueryRequest request) {
         FlightQueryCommand command = new FlightQueryCommand(
                 request.depCity(), request.arrCity(), request.depDate(),
-                request.priceMin(), request.priceMax(), request.planeId(), request.airportName());
-        List<FlightQueryResult> results = flightAppService.search(command);
-        return ApiResponse.ok(results.stream().map(FlightQueryResponse::from).toList());
+                request.priceMin(), request.priceMax(), request.planeId(), request.airportName(),
+                PageResult.normalizePage(request.page()), PageResult.normalizeSize(request.size()));
+        return ApiResponse.ok(flightAppService.search(command).map(FlightQueryResponse::from));
     }
 
     // ===== 写 =====
@@ -77,5 +77,12 @@ public class FlightController {
                 request.price(), request.cancellationFee(), request.gate(), request.status());
         FlightDetailResult result = flightAppService.update(id, command);
         return ApiResponse.ok(FlightDetailResponse.from(result));
+    }
+
+    /** 删除航班：已有订单的航班会返回 400"该航班已有订单，无法删除"。 */
+    @DeleteMapping("/{id}")
+    public ApiResponse<Void> delete(@PathVariable Long id) {
+        flightAppService.delete(id);
+        return ApiResponse.ok(null);
     }
 }

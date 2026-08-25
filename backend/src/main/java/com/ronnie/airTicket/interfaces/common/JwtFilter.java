@@ -52,6 +52,12 @@ public class JwtFilter extends OncePerRequestFilter {
             filterChain.doFilter(request, response);
             return;
         }
+        // 跨域预检请求（OPTIONS）不带 Authorization 头，必须放行交给 CORS 处理，
+        // 否则浏览器跨域请求会被 401 拦死（前端和后端分开部署时必踩的坑）
+        if ("OPTIONS".equalsIgnoreCase(request.getMethod())) {
+            filterChain.doFilter(request, response);
+            return;
+        }
 
         String token = resolveToken(request);
         if (token == null) {

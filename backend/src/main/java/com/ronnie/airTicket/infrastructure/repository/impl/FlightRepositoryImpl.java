@@ -45,4 +45,9 @@ public class FlightRepositoryImpl implements FlightRepository {
         }
         return flightMapper.update(po) > 0;   // 0 行 = 这行在锁后已被并发删除
     }
+
+    @Override
+    public boolean deleteById(Long id) {
+        return flightMapper.delete(id) > 0;   // 0 行 = 已被并发删除
+    }
 }

@@ -23,6 +23,26 @@ mybatis:
 server:
   port: 8080
 
+# ===== CORS：允许的来源，生产由环境变量覆盖（逗号分隔），默认放行本地前端 =====
+app:
+  cors:
+    allowed-origins: ${CORS_ALLOWED_ORIGINS:http://localhost:3000}
+
+# ===== Actuator：只暴露 health/info；health 带明细（含数据库连通性） =====
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info
+  endpoint:
+    health:
+      show-details: always
+
+# ===== 日志：level 里带 MDC 的 requestId，一次请求的日志用 requestId 串起来 =====
+logging:
+  pattern:
+    level: "%5p [%X{requestId}]"
+
 # ===== JWT 配置（敏感值不写死，从环境变量注入） =====
 jwt:
   # 密钥 / 有效期都来自环境变量：本地由 spring-dotenv 读取 backend/.env，

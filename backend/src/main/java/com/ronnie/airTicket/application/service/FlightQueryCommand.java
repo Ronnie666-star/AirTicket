@@ -11,6 +11,8 @@ public record FlightQueryCommand(
         BigDecimal priceMin,
         BigDecimal priceMax,
         Long planeId,
-        String airportName
+        String airportName,
+        int page,
+        int size
 ) {
 }

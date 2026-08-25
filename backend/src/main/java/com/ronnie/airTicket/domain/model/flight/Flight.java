@@ -86,6 +86,22 @@ public class Flight {
         validateTimes();
     }
 
+    /**
+     * 领域规则：下单/改签占用一张经济舱余票。
+     * 注意：订单表没有"舱级"列，这里统一按经济舱扣减 —— 数据模型的历史局限，见 README。
+     */
+    public void decrementEconomySeat() {
+        if (seatEconomyClass == null || seatEconomyClass <= 0) {
+            throw new DomainException("经济舱余票不足");
+        }
+        this.seatEconomyClass--;
+    }
+
+    /** 领域行为：退订/取消/改签释放一张经济舱余票。 */
+    public void incrementEconomySeat() {
+        this.seatEconomyClass++;
+    }
+
     /** 插入后回填自增主键（由 RepositoryImpl 在 INSERT 后调用）。 */
     public void assignId(Long id) {
         this.id = id;

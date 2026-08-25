@@ -8,6 +8,7 @@ import java.time.LocalDate;
  * 所有字段都可空：带什么条件就按什么筛，空搜索 = 返回全部航班。
  * depCity / arrCity 对应 flight.region_dep / region_arr（城市名）；
  * airportName 才是机场全名（存 airport.name，用它才触发 join）。
+ * page / size 是分页参数（可空，缺省 page=1, size=10，size 上限 100）。
  */
 public record FlightQueryRequest(
         String depCity,
@@ -16,6 +17,8 @@ public record FlightQueryRequest(
         BigDecimal priceMin,
         BigDecimal priceMax,
         Long planeId,
-        String airportName
+        String airportName,
+        Integer page,
+        Integer size
 ) {
 }
