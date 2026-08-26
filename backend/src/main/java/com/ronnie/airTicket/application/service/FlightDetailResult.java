@@ -28,7 +28,8 @@ public record FlightDetailResult(
         BigDecimal priceFirstClass,
         BigDecimal cancellationFee,
         String gate,
-        String status
+        String status,
+        Long createdBy
 ) {
     public static FlightDetailResult from(Flight flight) {
         return new FlightDetailResult(
@@ -38,7 +39,8 @@ public record FlightDetailResult(
                 flight.getRegionDep(), flight.getRegionArr(), flight.getDistance(),
                 flight.getSeatFirstClass(), flight.getSeatBusinessClass(), flight.getSeatEconomyClass(),
                 flight.getPrice(), flight.getPriceBusinessClass(), flight.getPriceFirstClass(),
-                flight.getCancellationFee(), flight.getGate(), flight.getStatus()
+                flight.getCancellationFee(), flight.getGate(), flight.getStatus(),
+                flight.getCreatedBy()
         );
     }
 }

@@ -1,10 +1,11 @@
 <script setup>
 // 玻璃态顶部导航：登录态按角色显示入口，未登录显示登录/注册。
-import { useRoute } from 'vue-router'
+import { useRoute, useRouter } from 'vue-router'
 import { useAuthStore } from '../stores/auth'
 import { toast } from '../composables/useToast'
 
 const route = useRoute()
+const router = useRouter()
 const auth = useAuthStore()
 
 const menu = [
@@ -24,6 +25,7 @@ function visible(item) {
 function logout() {
   auth.logout()
   toast.success('已退出登录')
+  router.push({ name: 'login' })
 }
 </script>
 

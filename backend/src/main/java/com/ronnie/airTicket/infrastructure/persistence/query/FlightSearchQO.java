@@ -14,6 +14,9 @@ import java.time.LocalDateTime;
 public class FlightSearchQO {
 
     private Long id;
+    private Long idPlane;
+    private Long idAirportDep;
+    private Long idAirportArr;
     private String code;
     private LocalDateTime datetimeDep;
     private LocalDateTime datetimeArr;
@@ -24,5 +27,10 @@ public class FlightSearchQO {
     private BigDecimal price;
     private BigDecimal priceBusinessClass;
     private BigDecimal priceFirstClass;
+    private Integer seatFirstClass;
+    private Integer seatBusinessClass;
+    private Integer seatEconomyClass;
+    private BigDecimal cancellationFee;
+    private Long createdBy;
     private String status;
 }

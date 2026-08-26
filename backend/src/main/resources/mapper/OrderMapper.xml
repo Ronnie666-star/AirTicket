@@ -84,6 +84,11 @@
         SELECT id FROM orders WHERE pay_status = #{payStatus}
     </select>
 
+    <!-- 航班取消用：找该航班下全部订单 id（逐单加锁退款 / 置取消） -->
+    <select id="findIdsByFlightId" resultType="java.lang.Long">
+        SELECT id FROM orders WHERE id_flight = #{flightId}
+    </select>
+
     <!-- ===== 写侧：聚合读写 ===== -->
 
     <select id="findById" resultType="OrderPO">

@@ -13,6 +13,7 @@ const orders = ref([])
 const loading = ref(false)
 
 const ORDER_STATUS_OPTIONS = [
+  { value: '', label: '全部' },
   { value: 'PENDING_TICKET_ISSUANCE', label: '待出票' },
   { value: 'ISSUED_TICKET', label: '已出票' },
   { value: 'VERIFIED', label: '已核销' },
@@ -21,6 +22,7 @@ const ORDER_STATUS_OPTIONS = [
   { value: 'CANCELLED', label: '已取消' }
 ]
 const PAY_STATUS_OPTIONS = [
+  { value: '', label: '全部' },
   { value: 'UNPAID', label: '未支付' },
   { value: 'PROCESSING', label: '支付中' },
   { value: 'PAID', label: '已支付' },

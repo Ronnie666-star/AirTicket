@@ -35,6 +35,17 @@ public class PaymentOrderStore {
         store.values().removeIf(po -> po.orderId().equals(orderId));
     }
 
+    /**
+     * 该订单上一次支付是否以失败收场（内存支付单置 FAILED = 确认失败时已回补余票）。
+     * 用于修正"失败->重付" / "失败->取消" / "失败->航班取消"的座位账，避免重复扣/回补。
+     * 注意：内存支付单重启即清空，重启后该标记丢失（属已知边界）。
+     */
+    public boolean isLastPaymentFailed(Long orderId) {
+        return findByOrderId(orderId)
+                .map(po -> po.status() == PaymentOrder.PaymentStatus.FAILED)
+                .orElse(false);
+    }
+
     public void clear() {
         store.clear();
     }

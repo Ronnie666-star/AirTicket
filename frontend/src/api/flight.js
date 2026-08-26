@@ -16,5 +16,8 @@ export const flightApi = {
   },
   remove(id) {
     return http.delete(`/flight/${id}`)
+  },
+  cancel(id) {
+    return http.post(`/flight/${id}/cancel`)
   }
 }

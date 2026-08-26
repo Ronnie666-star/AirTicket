@@ -4,7 +4,8 @@ defineProps({
   label: { type: String, default: '' },
   modelValue: { type: [String, Number], default: '' },
   options: { type: Array, default: () => [] },   // [{value, label}]
-  placeholder: { type: String, default: '请选择' }
+  placeholder: { type: String, default: '请选择' },
+  disabled: { type: Boolean, default: false }
 })
 const emit = defineEmits(['update:modelValue'])
 function onChange(e) {
@@ -15,7 +16,7 @@ function onChange(e) {
 <template>
   <div class="field">
     <label v-if="label" class="field-label">{{ label }}</label>
-    <select class="select" :value="modelValue" @change="onChange">
+    <select class="select" :value="modelValue" :disabled="disabled" @change="onChange">
       <option value="" disabled>{{ placeholder }}</option>
       <option v-for="opt in options" :key="opt.value" :value="opt.value">{{ opt.label }}</option>
     </select>

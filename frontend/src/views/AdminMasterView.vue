@@ -4,6 +4,7 @@ import { masterApi } from '../api/misc'
 import BaseCard from '../components/BaseCard.vue'
 import BaseButton from '../components/BaseButton.vue'
 import BaseInput from '../components/BaseInput.vue'
+import BaseSelect from '../components/BaseSelect.vue'
 import BaseModal from '../components/BaseModal.vue'
 import Skeleton from '../components/Skeleton.vue'
 import EmptyState from '../components/EmptyState.vue'
@@ -17,8 +18,8 @@ const TABS = [
     kind: 'plane', label: '机型',
     columns: ['modelName', 'idAirline'],
     fields: [
-      { key: 'idAirline', label: '所属航司 ID' },
       { key: 'modelName', label: '型号' },
+      { key: 'idAirline', label: '所属航司', type: 'select', source: 'airline' },
       { key: 'length', label: '长度(m)' },
       { key: 'wingspan', label: '翼展(m)' },
       { key: 'height', label: '高度(m)' },
@@ -48,6 +49,7 @@ async function load(kind = activeKind.value) {
   } finally {
     loading.value = false
   }
+  await ensureSources()
 }
 
 function switchTab(kind) {
@@ -56,18 +58,49 @@ function switchTab(kind) {
 }
 onMounted(() => load())
 
+// 下拉字段的数据源缓存（如机型的"所属航司"）；按需加载，加载过一次就不再拉
+const selectSources = ref({ airline: [], airport: [], plane: [] })
+async function ensureSources() {
+  const kinds = currentTab().fields.filter((f) => f.type === 'select').map((f) => f.source)
+  for (const k of kinds) {
+    if (!selectSources.value[k].length) {
+      try {
+        selectSources.value[k] = await masterApi.list(k)
+      } catch (e) {
+        toast.error(e.message)
+      }
+    }
+  }
+}
+function optionsFor(source) {
+  return selectSources.value[source].map((item) => ({
+    value: item.id,
+    label: item.name || item.modelName || item.channelName
+  }))
+}
+// 列表展示时把 ID 翻译成名字（如 idAirline -> 航司名）
+function cellValue(row, c) {
+  if (c === 'idAirline') {
+    const al = selectSources.value.airline.find((a) => a.id === row[c])
+    return al ? al.name : row[c]
+  }
+  return row[c]
+}
+
 // 新增 / 编辑
 const editOpen = ref(false)
 const editing = ref(null)          // null=新增
 const form = ref({})
-function openAdd() {
+async function openAdd() {
   editing.value = null
   form.value = {}
+  await ensureSources()
   editOpen.value = true
 }
-function openEdit(row) {
+async function openEdit(row) {
   editing.value = row
   form.value = { ...row }
+  await ensureSources()
   editOpen.value = true
 }
 async function save() {
@@ -121,7 +154,7 @@ async function remove(row) {
           <div class="row-name">{{ row.name || row.modelName || row.channelName }}</div>
           <div class="muted">
             <template v-for="(c, i) in currentTab().columns.filter(c => c !== 'name' && c !== 'modelName' && c !== 'channelName')" :key="c">
-              {{ c === 'idAirline' ? '航司 ' : '' }}{{ row[c] }}{{ i < currentTab().columns.length - 2 ? ' · ' : '' }}
+              {{ c === 'idAirline' ? '航司 ' : '' }}{{ cellValue(row, c) }}{{ i < currentTab().columns.length - 2 ? ' · ' : '' }}
             </template>
           </div>
         </div>
@@ -135,13 +168,21 @@ async function remove(row) {
 
     <BaseModal :open="editOpen" :title="editing ? '编辑' + currentTab().label : '新增' + currentTab().label" @close="editOpen = false">
       <div class="col">
-        <BaseInput
-          v-for="f in currentTab().fields"
-          :key="f.key"
-          :model-value="String(form[f.key] ?? '')"
-          :label="f.label"
-          @update:model-value="form[f.key] = $event"
-        />
+        <template v-for="f in currentTab().fields" :key="f.key">
+          <BaseSelect
+            v-if="f.type === 'select'"
+            v-model="form[f.key]"
+            :label="f.label"
+            :options="optionsFor(f.source)"
+            :placeholder="`请选择${f.label}`"
+          />
+          <BaseInput
+            v-else
+            :model-value="String(form[f.key] ?? '')"
+            :label="f.label"
+            @update:model-value="form[f.key] = $event"
+          />
+        </template>
       </div>
       <template #footer>
         <div class="row" style="justify-content:flex-end">

@@ -13,7 +13,6 @@ import com.ronnie.airTicket.domain.repository.FlightRepository;
 import com.ronnie.airTicket.domain.repository.OrderRepository;
 import com.ronnie.airTicket.infrastructure.config.DefaultChannelSeeder;
 import com.ronnie.airTicket.infrastructure.mapper.ChannelMapper;
-import com.ronnie.airTicket.infrastructure.mapper.FlightMapper;
 import com.ronnie.airTicket.infrastructure.mapper.OrderMapper;
 import com.ronnie.airTicket.infrastructure.persistence.po.ChannelPO;
 import com.ronnie.airTicket.infrastructure.persistence.query.OrderSearchQO;
@@ -43,7 +42,6 @@ public class OrderAppService {
     private final OrderRepository orderRepository;
     private final OrderMapper orderMapper;
     private final FlightRepository flightRepository;
-    private final FlightMapper flightMapper;
     private final ChannelMapper channelMapper;
     private final PaymentOrderStore paymentOrderStore;
 
@@ -104,6 +102,9 @@ public class OrderAppService {
         CabinClass cabin = cmd.cabinClass() == null ? CabinClass.ECONOMY_CLASS : cmd.cabinClass();
         Flight flight = flightRepository.findByIdForUpdate(cmd.flightId())
                 .orElseThrow(() -> new FlightNotFoundException(cmd.flightId()));
+        if (flight.isCancelled()) {
+            throw new DomainException("航班已取消，无法下单");
+        }
         flight.decrementSeat(cabin);
         flightRepository.save(flight);
 
@@ -258,7 +259,8 @@ public class OrderAppService {
     }
 
     /**
-     * 改签：本人订单，换同一航司、未起飞的航班，同舱互换余票 + 多退少补。
+     * 改签：本人订单，换同一航线、未起飞且未取消的航班，同舱互换余票 + 多退少补。
+     * 可改签的订单：已出票（普通改签）；或航班已取消且已退款的订单（取消时已回补座位，改签只换航班不退旧座）。
      * priceDiff = 新航班该舱票价 - 旧航班该舱票价（正=补差、负=应退），放入 adjustAmount。
      */
     @Transactional
@@ -274,20 +276,34 @@ public class OrderAppService {
         Flight newFlight = flightRepository.findByIdForUpdate(cmd.newFlightId())
                 .orElseThrow(() -> new FlightNotFoundException(cmd.newFlightId()));
 
-        // 限制改签时间：旧航班必须未起飞
-        if (!oldFlight.getDatetimeDep().isAfter(LocalDateTime.now())) {
+        boolean normalReschedule = order.getOrderStatus() == OrderStatus.ISSUED_TICKET;
+        boolean flightCancelledReschedule = order.getOrderStatus() == OrderStatus.CANCELLED
+                && order.getPayStatus() == PayStatus.REFUNDED && oldFlight.isCancelled();
+        if (!normalReschedule && !flightCancelledReschedule) {
+            throw new DomainException("只有已出票或航班已取消且已退款的订单才能改签");
+        }
+        // 限制改签时间：普通改签要求旧航班未起飞；航班取消的改签不受此限（取消航班出发时间已在过去）
+        if (normalReschedule && !oldFlight.getDatetimeDep().isAfter(LocalDateTime.now())) {
             throw new DomainException("航班已起飞，无法改签");
         }
-        // 限制改签航司：新旧航班同一航司
-        Long oldAirline = flightMapper.findAirlineIdByPlaneId(oldFlight.getIdPlane());
-        Long newAirline = flightMapper.findAirlineIdByPlaneId(newFlight.getIdPlane());
-        if (!oldAirline.equals(newAirline)) {
-            throw new DomainException("只能改签到同一航司的航班");
+        // 限制改签航线：新航班必须与旧航班同一起降地区（"同航线"）
+        if (!oldFlight.getRegionDep().equals(newFlight.getRegionDep())
+                || !oldFlight.getRegionArr().equals(newFlight.getRegionArr())) {
+            throw new DomainException("只能改签到相同航线的航班");
+        }
+        // 限制目标航班：未起飞、未取消
+        if (!newFlight.getDatetimeDep().isAfter(LocalDateTime.now())) {
+            throw new DomainException("目标航班已起飞，无法改签");
+        }
+        if (newFlight.isCancelled()) {
+            throw new DomainException("目标航班已取消，无法改签");
         }
         // 同舱多退少补 + 同舱互换余票（舱级从订单取，改签不变）
         CabinClass cabin = order.getCabinClass();
         BigDecimal priceDiff = newFlight.priceOf(cabin).subtract(oldFlight.priceOf(cabin));
-        oldFlight.incrementSeat(cabin);
+        if (normalReschedule) {
+            oldFlight.incrementSeat(cabin);   // 普通改签才还旧座；航班取消的单取消时座位已回补，不再重复 +1
+        }
         newFlight.decrementSeat(cabin);
         flightRepository.save(oldFlight);
         flightRepository.save(newFlight);
@@ -328,12 +344,10 @@ public class OrderAppService {
     /**
      * 该订单上一次支付是否以失败收场（内存支付单置 FAILED = 确认失败时已回补余票）。
      * 用于修正"失败->重付" / "失败->取消"的座位账，避免重复扣/回补。
-     * 注意：内存支付单重启即清空，重启后该标记丢失（残留 UNPAID 单取消会多回补一张座，属已知边界）。
+     * 判定逻辑在 PaymentOrderStore（FlightAppService 取消航班时也会复用）。
      */
     private boolean isLastPaymentFailed(Long orderId) {
-        return paymentOrderStore.findByOrderId(orderId)
-                .map(po -> po.status() == PaymentOrder.PaymentStatus.FAILED)
-                .orElse(false);
+        return paymentOrderStore.isLastPaymentFailed(orderId);
     }
 
     /** 退订/取消/支付失败时把订单指向航班的对应舱余票还回去（也要锁，防并发）。 */

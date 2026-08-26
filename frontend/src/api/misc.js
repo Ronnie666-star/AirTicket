@@ -16,6 +16,9 @@ export const passengerApi = {
 export const routeApi = {
   get(flightId) {
     return http.get('/route', { params: { flightId } })
+  },
+  update(flightId, data) {
+    return http.put(`/route/${flightId}`, data)
   }
 }
 

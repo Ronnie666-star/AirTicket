@@ -41,7 +41,7 @@ import org.springframework.web.bind.annotation.RestController;
  *   POST /order/{id}/pay/confirm 用户面确认支付（两段式第二步，可选 success）
  *   POST /order/{id}/cancel      退订/取消
  *   PUT  /order/{id}/verify      核销（仅商家/管理员）
- *   PUT  /order/{id}/reschedule  改签（仅商家/管理员）
+ *   PUT  /order/{id}/reschedule  改签（旅客可自助改签本人订单；归属校验在应用层）
  */
 @RequiredArgsConstructor
 @RestController
@@ -113,9 +113,8 @@ public class OrderController {
         return ApiResponse.ok(OrderDetailResponse.from(orderAppService.verify(userId, id)));
     }
 
-    /** 改签：换航班 + 多退少补。仅商家/管理员 + 归属校验。 */
+    /** 改签：换航班 + 多退少补。旅客可自助改签本人订单（归属校验在应用层），已出票或航班已取消且退款的订单可改签。 */
     @PutMapping("/{id}/reschedule")
-    @RequireRole({UserRole.MERCHANT, UserRole.ADMIN})
     public ApiResponse<OrderDetailResponse> reschedule(@RequestAttribute("userId") Long userId,
                                                        @PathVariable Long id,
                                                        @Valid @RequestBody OrderRescheduleRequest request) {

@@ -56,11 +56,15 @@ async function load() {
 }
 onMounted(load)
 
-function canPay() { return order.value.payStatus === 'UNPAID' }
-function canCancel() { return order.value.payStatus === 'UNPAID' }
+function canPay() { return order.value.payStatus === 'UNPAID' && order.value.orderStatus === 'PENDING_TICKET_ISSUANCE' }
+function canCancel() { return order.value.payStatus === 'UNPAID' && order.value.orderStatus === 'PENDING_TICKET_ISSUANCE' }
 function canRefund() { return order.value.payStatus === 'PAID' }
 function canVerify() { return order.value.orderStatus === 'ISSUED_TICKET' && auth.canManageFlights }
-function canResched() { return order.value.orderStatus === 'ISSUED_TICKET' && auth.canManageFlights }
+function canResched() {
+  if (order.value.orderStatus === 'ISSUED_TICKET') return true   // 旅客可自助改签已出票订单
+  // 航班取消后退款的订单可改签（未支付的取消单无退款可退，不可改签）
+  return order.value.orderStatus === 'CANCELLED' && order.value.payStatus === 'REFUNDED' && flight.value?.status === 'CANCELLED'
+}
 
 async function goPay() { router.push(`/payment/${order.value.id}`) }
 
@@ -104,15 +108,17 @@ async function verify() {
   }
 }
 
-// 改签：按旧航班起落地区搜候选（后端校验同航司/未起飞/该舱余票）
+// 改签：按旧航班起落地区搜同航线候选（后端校验未起飞/未取消/该舱余票/同航线），只列该舱还有余票的
 async function openResched() {
   reschedOpen.value = true
   selectedFlight.value = null
   candidates.value = []
   reschedLoading.value = true
   try {
-    const data = await flightApi.search({ depCity: flight.value.regionDep, arrCity: flight.value.regionArr, size: 30 })
-    candidates.value = (data.data || []).filter((f) => f.id !== flight.value.id)
+    const data = await flightApi.search({ depCity: flight.value.regionDep, arrCity: flight.value.regionArr, hideExpired: true, size: 50 })
+    const c = order.value.cabinClass
+    const seatKey = c === 'FIRST_CLASS' ? 'seatFirstClass' : c === 'BUSINESS_CLASS' ? 'seatBusinessClass' : 'seatEconomyClass'
+    candidates.value = (data.data || []).filter((f) => f.id !== flight.value.id && f[seatKey] > 0)
   } catch (e) {
     toast.error(e.message)
   } finally {
@@ -181,6 +187,10 @@ async function submitResched() {
       <BaseButton variant="secondary" class="mt" @click="goPay">前往支付</BaseButton>
     </div>
 
+    <div v-if="flight.status === 'CANCELLED'" class="tip cancelled-tip">
+      ⚠️ 该航班因天气等原因已取消并全额退款，可点击下方"改签"重新选择同航线航班
+    </div>
+
     <div class="actions row">
       <BaseButton v-if="canPay()" @click="goPay">去支付</BaseButton>
       <BaseButton v-if="canCancel()" variant="secondary" :disabled="acting" @click="cancel">取消订单</BaseButton>
@@ -191,7 +201,7 @@ async function submitResched() {
 
     <BaseModal :open="reschedOpen" title="选择改签航班" @close="reschedOpen = false">
       <p class="muted">
-        当前舱级 {{ cabinLabel }}，改签差价 = 新航班同舱票价 − 旧航班同舱票价（正=补差、负=应退）
+        仅列出同航线、未起飞且该舱还有余票的航班。改签差价 = 新航班同舱票价 − 旧航班同舱票价（正=补差、负=应退）
       </p>
       <div v-if="reschedLoading" class="mt"><Skeleton :rows="3" /></div>
       <div v-else class="cand-list">
@@ -256,6 +266,10 @@ async function submitResched() {
   flex-direction: column;
   align-items: flex-start;
   gap: var(--space-2);
+}
+.cancelled-tip {
+  background: rgba(255, 59, 48, 0.08);
+  color: var(--color-danger);
 }
 .actions { flex-wrap: wrap; }
 .cand-list { display: flex; flex-direction: column; gap: var(--space-2); margin-top: var(--space-3); max-height: 320px; overflow-y: auto; }

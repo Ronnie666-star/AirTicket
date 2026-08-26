@@ -7,6 +7,7 @@ import org.apache.ibatis.annotations.Param;
 
 import java.math.BigDecimal;
 import java.time.LocalDate;
+import java.time.LocalDateTime;
 import java.util.List;
 
 /**
@@ -27,6 +28,8 @@ public interface FlightMapper {
             @Param("priceMax") BigDecimal priceMax,
             @Param("planeId") Long planeId,
             @Param("airportName") String airportName,
+            @Param("code") String code,
+            @Param("now") LocalDateTime now,
             @Param("offset") int offset,
             @Param("size") int size
     );
@@ -39,7 +42,9 @@ public interface FlightMapper {
             @Param("priceMin") BigDecimal priceMin,
             @Param("priceMax") BigDecimal priceMax,
             @Param("planeId") Long planeId,
-            @Param("airportName") String airportName
+            @Param("airportName") String airportName,
+            @Param("code") String code,
+            @Param("now") LocalDateTime now
     );
 
     // ===== 写侧：聚合读写（返回/接收 PO）=====
@@ -49,9 +54,6 @@ public interface FlightMapper {
 
     /** 按 id 取一行并加行锁（FOR UPDATE）：写路径"读-改-写"用，防并发删改。必须配合 @Transactional 使用。 */
     FlightPO findByIdForUpdate(@Param("id") Long id);
-
-    /** 改签时校验"同航司"：查某机型所属的航空公司 id（plane.id_airline）。 */
-    Long findAirlineIdByPlaneId(@Param("planeId") Long planeId);
 
     /** 插入一行，自增主键回填到 po.getId()（useGeneratedKeys）。返回受影响行数。 */
     int insert(FlightPO po);

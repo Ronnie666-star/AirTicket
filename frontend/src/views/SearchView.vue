@@ -23,6 +23,8 @@ async function search() {
     if (filters.depDate) params.depDate = filters.depDate
     if (filters.priceMin) params.priceMin = filters.priceMin
     if (filters.priceMax) params.priceMax = filters.priceMax
+    // 隐藏出发时间早于系统当地时间的航班（不可购航班不展示）
+    params.hideExpired = true
     params.size = 50
     const data = await flightApi.search(params)
     flights.value = data.data || []
@@ -34,6 +36,15 @@ async function search() {
 }
 
 onMounted(search)
+
+function reset() {
+  filters.depCity = ''
+  filters.arrCity = ''
+  filters.depDate = ''
+  filters.priceMin = ''
+  filters.priceMax = ''
+  search()
+}
 </script>
 
 <template>
@@ -49,6 +60,7 @@ onMounted(search)
         <BaseInput v-model="filters.priceMin" placeholder="最低价" type="number" />
         <BaseInput v-model="filters.priceMax" placeholder="最高价" type="number" />
         <BaseButton @click="search">搜索</BaseButton>
+        <BaseButton variant="ghost" @click="reset">重置</BaseButton>
       </div>
     </BaseCard>
 
@@ -104,7 +116,7 @@ onMounted(search)
 .filter-card { margin-bottom: var(--space-6); }
 .filter-grid {
   display: grid;
-  grid-template-columns: 1fr 1fr 1fr 1fr 1fr auto;
+  grid-template-columns: 1fr 1fr 1fr 1fr 1fr auto auto;
   gap: var(--space-3);
   align-items: end;
 }

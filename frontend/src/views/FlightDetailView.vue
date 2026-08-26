@@ -85,6 +85,7 @@ function goBook() {
     </div>
 
     <div class="cta">
+      <BaseButton variant="ghost" size="lg" block class="track-btn" @click="router.push(`/tracking/${flight.id}`)">实时轨迹</BaseButton>
       <BaseButton size="lg" block @click="goBook">选舱下单</BaseButton>
     </div>
   </div>
@@ -107,6 +108,6 @@ function goBook() {
 .cabin-list { display: flex; flex-direction: column; gap: var(--space-3); margin-bottom: var(--space-6); }
 .cabin-name { font-size: var(--text-lg); font-weight: 600; }
 .cabin-price { font-size: var(--text-xl); font-weight: 700; color: var(--color-accent); }
-.cta { max-width: 320px; margin: 0 auto; }
+.cta { max-width: 320px; margin: 0 auto; display: flex; flex-direction: column; gap: var(--space-2); }
 .error-state { text-align: center; padding: var(--space-8); }
 </style>

@@ -17,6 +17,7 @@ import java.time.LocalDateTime;
  *   支付确认失败 -> 回退 未支付 / 待出票（confirmFailed）
  *   未支付取消   -> 已取消（cancelUnpaid）
  *   退订退款     -> 已退款 / 已退订（cancelRefund）
+ *   航班取消     -> 已取消 + 全额退款（cancelByFlightCancellation）
  *   核销        -> 已核销（verify）
  *   改签        -> 换航班 + 多退少补（reschedule）
  *
@@ -71,10 +72,10 @@ public class Order {
         this.createAt = createAt;
     }
 
-    /** 支付发起：只有未支付订单能发起，置"支付中"，不改变订单状态、不产生出票时间。 */
+    /** 支付发起：只有未支付且待出票的订单能发起，置"支付中"，不改变订单状态、不产生出票时间。 */
     public void pay() {
-        if (payStatus != PayStatus.UNPAID) {
-            throw new DomainException("只有未支付订单才能支付");
+        if (payStatus != PayStatus.UNPAID || orderStatus != OrderStatus.PENDING_TICKET_ISSUANCE) {
+            throw new DomainException("只有待出票的未支付订单才能支付");
         }
         this.payStatus = PayStatus.PROCESSING;
     }
@@ -101,11 +102,26 @@ public class Order {
         this.orderStatus = OrderStatus.PENDING_TICKET_ISSUANCE;
     }
 
-    /** 未支付取消：只有未支付订单能取消（不退款）。 */
+    /** 未支付取消：只有未支付且待出票的订单能取消（不退款）。 */
     public void cancelUnpaid() {
-        if (payStatus != PayStatus.UNPAID) {
-            throw new DomainException("只有未支付订单才能取消");
+        if (payStatus != PayStatus.UNPAID || orderStatus != OrderStatus.PENDING_TICKET_ISSUANCE) {
+            throw new DomainException("只有待出票的未支付订单才能取消");
         }
+        this.orderStatus = OrderStatus.CANCELLED;
+        this.cancelTime = LocalDateTime.now();
+    }
+
+    /**
+     * 航班取消导致订单取消（放票管理把航班置"已取消"）：已支付全额退款（payStatus=REFUNDED）、
+     * 支付中回未支付（未实际收款）、未支付保持未支付；一律置"已取消"并记取消时间。
+     * 不含座位账（回补/不补由应用层按"该单是否占座"决定），也不适用于已结算终态订单（调用方先行跳过）。
+     */
+    public void cancelByFlightCancellation() {
+        this.payStatus = switch (payStatus) {
+            case PAID -> PayStatus.REFUNDED;
+            case PROCESSING -> PayStatus.UNPAID;
+            default -> payStatus;
+        };
         this.orderStatus = OrderStatus.CANCELLED;
         this.cancelTime = LocalDateTime.now();
     }
@@ -131,13 +147,21 @@ public class Order {
     /**
      * 改签：换指向的航班 + 多退少补。
      * priceDiff 由应用层算好传入（新票价 - 旧票价，可负）。
+     * 可改签的订单：已出票（ISSUED_TICKET）—— 换同航线未起飞航班；或航班已取消且已全额退款的订单
+     * （CANCELLED + REFUNDED）—— 取消时座位已回补，改签只换航班不退旧座。其余状态拒绝。
+     * 退款后改签：payStatus 置回 PAID，语义是"退款额视为余额重新用于新航班"。
      */
     public void reschedule(Long newFlightId, BigDecimal priceDiff) {
-        if (orderStatus != OrderStatus.ISSUED_TICKET) {
-            throw new DomainException("只有已出票订单才能改签");
+        boolean reschedulable = orderStatus == OrderStatus.ISSUED_TICKET
+                || (orderStatus == OrderStatus.CANCELLED && payStatus == PayStatus.REFUNDED);
+        if (!reschedulable) {
+            throw new DomainException("只有已出票或已全额退款的取消订单才能改签");
         }
         if (newFlightId == null) {
             throw new DomainException("改签目标航班不能为空");
+        }
+        if (payStatus == PayStatus.REFUNDED) {
+            this.payStatus = PayStatus.PAID;
         }
         this.flightId = newFlightId;
         this.totalPrice = this.totalPrice.add(priceDiff);

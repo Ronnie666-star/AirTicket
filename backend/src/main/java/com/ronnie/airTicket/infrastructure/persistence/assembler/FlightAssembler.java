@@ -24,7 +24,7 @@ public class FlightAssembler {
                 po.getSeatFirstClass(), po.getSeatBusinessClass(), po.getSeatEconomyClass(),
                 po.getPrice(), po.getPriceBusinessClass(), po.getPriceFirstClass(),
                 po.getCancellationFee(), po.getGate(), po.getStatus(),
-                po.getCreateAt()
+                po.getCreatedBy(), po.getCreateAt()
         );
     }
 
@@ -49,6 +49,7 @@ public class FlightAssembler {
         po.setCancellationFee(flight.getCancellationFee());
         po.setGate(flight.getGate());
         po.setStatus(flight.getStatus());
+        po.setCreatedBy(flight.getCreatedBy());
         po.setCreateAt(flight.getCreateAt());
         return po;
     }

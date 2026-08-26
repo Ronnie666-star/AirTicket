@@ -15,6 +15,11 @@
 
     <sql id="searchConditions">
         <where>
+            <!-- 隐藏已过期航班：搜航班页传 now，出发早于系统当地时间的不可购航班不出现 -->
+            <if test="now != null">
+                AND f.datetime_dep &gt;= #{now}
+                AND f.status &lt;&gt; 'CANCELLED'
+            </if>
             <if test="depCity != null and depCity != ''">
                 AND f.region_dep = #{depCity}
             </if>
@@ -35,6 +40,9 @@
             <if test="planeId != null">
                 AND f.id_plane = #{planeId}
             </if>
+            <if test="code != null and code != ''">
+                AND f.code = #{code}
+            </if>
             <if test="airportName != null and airportName != ''">
                 AND (ad.name = #{airportName} OR ar.name = #{airportName})
             </if>
@@ -43,6 +51,9 @@
 
     <select id="search" resultType="com.ronnie.airTicket.infrastructure.persistence.query.FlightSearchQO">
         SELECT f.id,
+               f.id_plane,
+               f.id_airport_dep,
+               f.id_airport_arr,
                f.code,
                f.datetime_dep,
                f.datetime_arr,
@@ -53,6 +64,11 @@
                f.price,
                f.price_business_class,
                f.price_first_class,
+               f.seat_first_class,
+               f.seat_business_class,
+               f.seat_economy_class,
+               f.cancellation_fee,
+               f.created_by,
                f.status
         <include refid="searchFrom"/>
         <include refid="searchConditions"/>
@@ -71,7 +87,7 @@
     <select id="findById" resultType="FlightPO">
         SELECT id, id_plane, id_airport_dep, id_airport_arr, code, datetime_dep, datetime_arr,
                region_dep, region_arr, distance, seat_first_class, seat_business_class, seat_economy_class,
-               price, price_business_class, price_first_class, cancellation_fee, gate, status, create_at
+               price, price_business_class, price_first_class, cancellation_fee, gate, status, created_by, create_at
         FROM flight
         WHERE id = #{id}
     </select>
@@ -81,15 +97,10 @@
     <select id="findByIdForUpdate" resultType="FlightPO">
         SELECT id, id_plane, id_airport_dep, id_airport_arr, code, datetime_dep, datetime_arr,
                region_dep, region_arr, distance, seat_first_class, seat_business_class, seat_economy_class,
-               price, price_business_class, price_first_class, cancellation_fee, gate, status, create_at
+               price, price_business_class, price_first_class, cancellation_fee, gate, status, created_by, create_at
         FROM flight
         WHERE id = #{id}
         FOR UPDATE
-    </select>
-
-    <!-- 改签校验同航司用：机型 -> 航司 -->
-    <select id="findAirlineIdByPlaneId" resultType="java.lang.Long">
-        SELECT id_airline FROM plane WHERE id = #{planeId}
     </select>
 
     <!-- useGeneratedKeys：把自增主键回填到 po.id；create_at 不写，交给 DEFAULT CURRENT_TIMESTAMP -->
@@ -97,14 +108,15 @@
         INSERT INTO flight (id_plane, id_airport_dep, id_airport_arr, code, datetime_dep, datetime_arr,
                             region_dep, region_arr, distance, seat_first_class, seat_business_class,
                             seat_economy_class, price, price_business_class, price_first_class,
-                            cancellation_fee, gate, status)
+                            cancellation_fee, gate, status, created_by)
         VALUES (#{idPlane}, #{idAirportDep}, #{idAirportArr}, #{code}, #{datetimeDep}, #{datetimeArr},
                 #{regionDep}, #{regionArr}, #{distance}, #{seatFirstClass}, #{seatBusinessClass},
                 #{seatEconomyClass}, #{price}, #{priceBusinessClass}, #{priceFirstClass},
-                #{cancellationFee}, #{gate}, #{status})
+                #{cancellationFee}, #{gate}, #{status}, #{createdBy})
     </insert>
 
-    <!-- 全字段更新；唯一性由 (code, datetime_dep) 唯一索引兜底，撞了抛 DuplicateKeyException -->
+    <!-- 全字段更新；created_by 是身份字段（final，不可变），照原值写回。 -->
+    <!-- 唯一性由 (code, datetime_dep) 唯一索引兜底，撞了抛 DuplicateKeyException -->
     <update id="update">
         UPDATE flight
         SET id_plane = #{idPlane},
@@ -124,7 +136,8 @@
             price_first_class = #{priceFirstClass},
             cancellation_fee = #{cancellationFee},
             gate = #{gate},
-            status = #{status}
+            status = #{status},
+            created_by = #{createdBy}
         WHERE id = #{id}
     </update>
 

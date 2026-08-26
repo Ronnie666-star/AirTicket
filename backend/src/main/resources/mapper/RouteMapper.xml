@@ -10,4 +10,18 @@
         WHERE id_flight = #{flightId}
     </select>
 
+    <!-- 模拟机器检测自动更新的编辑入口：唯一索引撞车则覆盖（ON DUPLICATE KEY UPDATE），否则插入 -->
+    <insert id="upsert">
+        INSERT INTO route (id_flight, distance_remain, time_remain, altitude, speed, latitude, longitude, time_stamp)
+        VALUES (#{idFlight}, #{distanceRemain}, #{timeRemain}, #{altitude}, #{speed}, #{latitude}, #{longitude}, #{timeStamp})
+        ON DUPLICATE KEY UPDATE
+            distance_remain = VALUES(distance_remain),
+            time_remain = VALUES(time_remain),
+            altitude = VALUES(altitude),
+            speed = VALUES(speed),
+            latitude = VALUES(latitude),
+            longitude = VALUES(longitude),
+            time_stamp = VALUES(time_stamp)
+    </insert>
+
 </mapper>

@@ -2,6 +2,7 @@ package com.ronnie.airTicket.domain.repository;
 
 import com.ronnie.airTicket.domain.model.order.Order;
 
+import java.util.List;
 import java.util.Optional;
 
 /**
@@ -25,4 +26,7 @@ public interface OrderRepository {
 
     /** 某航班下有多少订单（删除航班的保护性校验）。 */
     long countByFlightId(Long flightId);
+
+    /** 某航班下的全部订单 id（航班取消时逐单退款 / 置取消用）。 */
+    List<Long> findIdsByFlightId(Long flightId);
 }

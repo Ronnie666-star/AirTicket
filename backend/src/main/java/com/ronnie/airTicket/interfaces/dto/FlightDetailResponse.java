@@ -25,7 +25,8 @@ public record FlightDetailResponse(
         BigDecimal priceFirstClass,
         BigDecimal cancellationFee,
         String gate,
-        String status
+        String status,
+        Long createdBy
 ) {
     public static FlightDetailResponse from(FlightDetailResult result) {
         return new FlightDetailResponse(
@@ -35,7 +36,8 @@ public record FlightDetailResponse(
                 result.regionDep(), result.regionArr(), result.distance(),
                 result.seatFirstClass(), result.seatBusinessClass(), result.seatEconomyClass(),
                 result.price(), result.priceBusinessClass(), result.priceFirstClass(),
-                result.cancellationFee(), result.gate(), result.status()
+                result.cancellationFee(), result.gate(), result.status(),
+                result.createdBy()
         );
     }
 }

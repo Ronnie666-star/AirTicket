@@ -40,12 +40,16 @@ const emit = defineEmits(['close'])
   justify-content: center;
   z-index: 100;
   padding: var(--space-5);
+  overflow-y: auto;
 }
 .modal {
   background: var(--color-surface);
   border-radius: var(--radius-lg);
   box-shadow: var(--shadow-lg);
   width: 100%;
+  max-height: 100%;
+  display: flex;
+  flex-direction: column;
   overflow: hidden;
 }
 .modal-head {
@@ -66,7 +70,12 @@ const emit = defineEmits(['close'])
   font-size: var(--text-sm);
 }
 .modal-close:hover { background: var(--color-border); }
-.modal-body { padding: 0 var(--space-5) var(--space-5); }
+.modal-body {
+  padding: 0 var(--space-5) var(--space-5);
+  overflow-y: auto;
+  flex: 1 1 auto;
+  min-height: 0;
+}
 .modal-foot { padding: var(--space-4) var(--space-5); border-top: 1px solid var(--color-border); }
 
 .modal-enter-active, .modal-leave-active { transition: opacity var(--transition-base); }

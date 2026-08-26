@@ -8,6 +8,7 @@ import com.ronnie.airTicket.infrastructure.persistence.po.OrderPO;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Repository;
 
+import java.util.List;
 import java.util.Optional;
 
 /**
@@ -49,5 +50,10 @@ public class OrderRepositoryImpl implements OrderRepository {
     @Override
     public long countByFlightId(Long flightId) {
         return orderMapper.countByFlightId(flightId);
+    }
+
+    @Override
+    public List<Long> findIdsByFlightId(Long flightId) {
+        return orderMapper.findIdsByFlightId(flightId);
     }
 }

@@ -31,5 +31,6 @@ public class FlightPO {
     private BigDecimal cancellationFee;
     private String gate;
     private String status;
+    private Long createdBy;
     private LocalDateTime createAt;
 }
