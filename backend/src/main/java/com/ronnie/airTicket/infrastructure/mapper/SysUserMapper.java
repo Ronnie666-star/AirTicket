@@ -26,6 +26,9 @@ public interface SysUserMapper {
     /** 用户总数：初始化端点判断"系统是否已存在用户"用。 */
     long count();
 
+    /** 某角色用户数：初始化端点判断"系统是否已存在管理员"用（V6 内置了旅客/商家演示数据后，仍允许创建初始管理员）。 */
+    long countByRole(@Param("role") String role);
+
     /** 用户列表（管理员）：按 username / role / enabled 筛选，任一可选。 */
     List<SysUserPO> search(
             @Param("username") String username,

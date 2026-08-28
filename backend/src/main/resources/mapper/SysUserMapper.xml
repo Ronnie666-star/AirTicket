@@ -18,6 +18,10 @@
         SELECT COUNT(*) FROM sys_user
     </select>
 
+    <select id="countByRole" resultType="long">
+        SELECT COUNT(*) FROM sys_user WHERE role = #{role}
+    </select>
+
     <!-- useGeneratedKeys：把自增主键回填到 po.id；create_at 不写，交给 DEFAULT CURRENT_TIMESTAMP -->
     <insert id="insert" useGeneratedKeys="true" keyProperty="id">
         INSERT INTO sys_user (username, password, real_name, age, email, phone, status, role)

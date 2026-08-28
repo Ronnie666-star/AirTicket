@@ -66,7 +66,7 @@ com.ronnie.airTicket
 - **鉴权**：`JwtFilter` 解析 `Authorization: Bearer`，白名单 `/login /register /init /actuator/health /pay/callback`；通过后注入请求属性 `userId`、`role`。
 - **授权**：`@RequireRole(UserRole...)` 注解标在 Controller 方法上，由 `AuthInterceptor` 校验；拦截器只注册到 `/flight/** /order/** /admin/** /master/**`。**不在这些前缀下的新 Controller 要记得加拦截路径**。
 - **归属校验**：操作订单类接口先从 `@RequestAttribute("userId")` 取当前用户，他人订单 → `ForbiddenException`（403）。
-- **账号供给（不可破坏）**：管理员=初始化 `POST /init/admin`（仅空库，`UserRepository.count()==0`）· 商家=管理员 `POST /admin/users` · 旅客=自助 `POST /register`。**没有任何其他创建管理员 / 商家的路径**。
+- **账号供给（不可破坏）**：管理员=初始化 `POST /init/admin`（系统**无管理员**时可用，`countByRole(ADMIN)==0`；V6 内置的旅客/商家演示数据不影响初始化）· 商家=管理员 `POST /admin/users` · 旅客=自助 `POST /register`。**没有任何其他创建管理员 / 商家的路径**。
 
 ---
 
@@ -90,6 +90,13 @@ com.ronnie.airTicket
 ### 4.5 渠道自愈
 `DefaultChannelSeeder`（`ApplicationReadyEvent`）在 `channel` 空时插"官方网站"；`OrderAppService.defaultChannelId()` 实时查渠道 id（兜底 1L）。**别硬编码渠道 id**。
 
+### 4.6 统计（`StatsMapper` / `/admin/stats/**`，仅管理员）
+3 个统计功能，纯读侧聚合，SQL 全部在 `StatsMapper.xml`：
+- `GET /admin/stats/flight-sales?limit=N` 热门航班销量 Top（`COUNT` + `SUM(CASE WHEN pay_status IN ('PAID','REFUNDED'))` + `GROUP BY`，容量取自 `plane` 三舱上限）；
+- `GET /admin/stats/revenue` 营收总览（整表聚合单行）、`/revenue/channels` 渠道占比（`LEFT JOIN` 含无订单渠道）；
+- `GET /admin/stats/top-passengers?limit=N` 旅客消费排行（`sys_user JOIN orders`，限 PAID/REFUNDED）。
+口径统一：**成交金额 = 已支付/已退款订单金额之和**；退款单列。改统计 SQL 时保持口径一致，否则演示数字对不上。
+
 ---
 
 ## 5. 数据库（Flyway）
@@ -101,9 +108,12 @@ com.ronnie.airTicket
 | `V1__create_all_tables.sql` | 9 张表 + CHECK + 唯一索引 |
 | `V2__seed_sys_user.sql` | **占位（无演示账号）** |
 | `V3__add_cabin_class_and_cabin_prices.sql` | `orders.cabin_class`、`flight` 三舱价列 |
+| `V4__add_flight_owner.sql` | `flight.created_by`（放票者归属） |
+| `V5__add_orders_flight_index.sql` | `orders(id_flight)` 索引 |
+| `V6__seed_demo_data.sql` | 演示数据：6 航司 / 10 机场 / 10 机型 / 3 渠道 / 12 用户 / 42 航班 / 12 轨迹 / 66 订单 / 14 常乘机人（实体 175 / 关联约 374，满足"实体≥30、关联≥200"） |
 
-- **没有种子账号**：管理员靠初始化端点建；"官方网站"渠道靠启动自愈建。
-- **新迁移规则**：只加 `V{n+1}__xxx.sql`（纯增量 ALTER），**不要改已执行的 V1/V2/V3**（Flyway 校验和会拒绝）。要改 DDL 先跟用户确认。
+- **账号来源**：管理员靠初始化端点建（V6 不含管理员）；演示用户（旅客/商家，密码均 `Pass@1234`）由 V6 内置；"官方网站"渠道靠启动自愈建（V6 已含该渠道，自愈会跳过）。
+- **新迁移规则**：只加 `V{n+1}__xxx.sql`（纯增量 ALTER），**不要改已执行的 V1~V6**（Flyway 校验和会拒绝）。要改 DDL 先跟用户确认。
 - 列名 → 驼峰自动映射已开（`map-underscore-to-camel-case`），Mapper XML 里 `resultType` 用 PO/QO 类名即可，别名可省。
 
 ---
@@ -117,7 +127,7 @@ frontend/src/
 ├── router/index.js # 路由守卫：未登录→/login；meta.admin→仅管理员；meta.merchant→仅商家/管理员
 ├── components/     # AppNav / BaseButton / BaseCard / BaseInput / BaseSelect / BaseModal / Toast / EmptyState / Skeleton
 ├── styles/         # tokens.css（Apple 设计令牌）+ global.css
-└── views/          # 页面：Login/Register/Init、Search/FlightDetail/Tracking、Booking/Payment、OrderList/OrderDetail、Profile、AdminUsers/AdminMaster/AdminFlights
+└── views/          # 页面：Login/Register/Init、Search/FlightDetail/Tracking、Booking/Payment、OrderList/OrderDetail、Profile、AdminUsers/AdminStats/AdminMaster/AdminFlights
 ```
 
 - **API 约定**：`http` 请求拦截器自动带 `Bearer`；响应拦截器 `code===0` 返回 `data`，否则 reject `msg`。**前端 API 模块与后端 DTO 字段一一对应**，改后端响应字段要同步改 `api/*.js` 和对应 view。
@@ -133,7 +143,7 @@ frontend/src/
 3. 写用例：`@Transactional` + `findByIdForUpdate`；权限：`@RequireRole` + 归属校验。
 4. 改完：`cd backend && mvn -q compile` 必须过；涉及 SQL 用 curl 起后端验证。
 5. 前端：改完 `cd frontend && pnpm build` 必须过。
-6. **不要**：改 V1/V2/V3 迁移、往 domain 塞 Spring、硬编码渠道 id、绕过 `User.create` 建用户、写经济舱专用座位方法。
+6. **不要**：改已执行的迁移（V1~V6）、往 domain 塞 Spring、硬编码渠道 id、绕过 `User.create` 建用户、写经济舱专用座位方法。
 
 ---
 

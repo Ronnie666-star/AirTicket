@@ -1,0 +1,68 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.ronnie.airTicket.infrastructure.mapper.StatsMapper">
+
+    <!-- 统计① 热门航班销量 Top：按非取消订单数（= 已售座位数）降序。
+         取消的订单不算销量；成交金额 = 已支付 / 已退款订单金额之和（口径与营收总览一致）。
+         利用率 = order_count / capacity（plane 三舱上限之和），由前端计算。 -->
+    <select id="topFlightSales" resultType="com.ronnie.airTicket.infrastructure.persistence.query.FlightSalesQO">
+        SELECT f.id            AS flight_id,
+               f.code,
+               f.region_dep,
+               f.region_arr,
+               f.datetime_dep,
+               COUNT(o.id)     AS order_count,
+               COALESCE(SUM(CASE WHEN o.pay_status IN ('PAID', 'REFUNDED') THEN o.total_price ELSE 0 END), 0) AS revenue,
+               (p.max_seat_first_class + p.max_seat_business_class + p.max_seat_economy_class) AS capacity
+        FROM flight f
+        LEFT JOIN plane p ON f.id_plane = p.id
+        LEFT JOIN orders o ON o.id_flight = f.id AND o.order_status &lt;&gt; 'CANCELLED'
+        GROUP BY f.id, f.code, f.region_dep, f.region_arr, f.datetime_dep,
+                 p.max_seat_first_class, p.max_seat_business_class, p.max_seat_economy_class
+        ORDER BY order_count DESC, revenue DESC
+        LIMIT #{limit}
+    </select>
+
+    <!-- 统计② 营收总览：整表聚合，单行。
+         成交总额 = 已支付/已退款订单金额；实收营收 = 仅已支付；退款总额 = 仅已退款；
+         退票费收入 = 退订订单（order_status=REFUNDED）的 flight.cancellation_fee 之和。 -->
+    <select id="revenueOverview" resultType="com.ronnie.airTicket.infrastructure.persistence.query.RevenueOverviewQO">
+        SELECT COALESCE(SUM(CASE WHEN o.pay_status IN ('PAID', 'REFUNDED') THEN o.total_price ELSE 0 END), 0) AS total_revenue,
+               COALESCE(SUM(CASE WHEN o.pay_status = 'PAID' THEN o.total_price ELSE 0 END), 0) AS collected_revenue,
+               COALESCE(SUM(CASE WHEN o.pay_status = 'REFUNDED' THEN o.total_price ELSE 0 END), 0) AS refund_amount,
+               COALESCE(SUM(CASE WHEN o.order_status = 'REFUNDED' THEN f.cancellation_fee ELSE 0 END), 0) AS cancellation_fee_income,
+               COALESCE(SUM(CASE WHEN o.pay_status = 'PAID' THEN 1 ELSE 0 END), 0) AS paid_order_count,
+               COALESCE(SUM(CASE WHEN o.order_status = 'REFUNDED' THEN 1 ELSE 0 END), 0) AS refund_count,
+               COUNT(*) AS total_order_count
+        FROM orders o
+        LEFT JOIN flight f ON o.id_flight = f.id
+    </select>
+
+    <!-- 统计② 渠道营收占比：按渠道分组，含无订单渠道（LEFT JOIN）。 -->
+    <select id="channelRevenue" resultType="com.ronnie.airTicket.infrastructure.persistence.query.ChannelRevenueQO">
+        SELECT ch.id           AS channel_id,
+               ch.channel_name,
+               COUNT(o.id)     AS order_count,
+               COALESCE(SUM(CASE WHEN o.pay_status IN ('PAID', 'REFUNDED') THEN o.total_price ELSE 0 END), 0) AS revenue
+        FROM channel ch
+        LEFT JOIN orders o ON o.id_channel = ch.id
+        GROUP BY ch.id, ch.channel_name
+        ORDER BY revenue DESC, ch.id
+    </select>
+
+    <!-- 统计③ 旅客消费排行 Top：限已支付/已退款订单（成交过的），按成交金额降序。 -->
+    <select id="topPassengers" resultType="com.ronnie.airTicket.infrastructure.persistence.query.TopPassengerQO">
+        SELECT u.id       AS user_id,
+               u.username,
+               u.real_name,
+               COUNT(o.id) AS order_count,
+               COALESCE(SUM(o.total_price), 0) AS total_spend
+        FROM sys_user u
+        JOIN orders o ON o.id_user = u.id
+        WHERE o.pay_status IN ('PAID', 'REFUNDED')
+        GROUP BY u.id, u.username, u.real_name
+        ORDER BY total_spend DESC, order_count DESC
+        LIMIT #{limit}
+    </select>
+
+</mapper>

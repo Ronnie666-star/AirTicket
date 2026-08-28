@@ -1,6 +1,7 @@
 package com.ronnie.airTicket.domain.repository;
 
 import com.ronnie.airTicket.domain.model.user.User;
+import com.ronnie.airTicket.domain.model.user.UserRole;
 
 import java.util.Optional;
 
@@ -16,6 +17,9 @@ public interface UserRepository {
 
     /** 系统用户总数：初始化端点判断"系统是否已存在用户"用。 */
     long count();
+
+    /** 某角色用户数：初始化端点判断"系统是否已存在管理员"用（V6 内置旅客/商家演示数据后，仍允许创建初始管理员）。 */
+    long countByRole(UserRole role);
 
     /**
      * 保存聚合：内部判断 id==null 走 insert（主键回填），否则走 update。

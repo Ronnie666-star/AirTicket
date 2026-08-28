@@ -12,9 +12,10 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 /**
- * 初始化用例：在系统尚无任何用户时创建初始管理员（唯一入口，只允许一次）。
+ * 初始化用例：在系统尚无任何管理员时创建初始管理员（唯一入口，只允许一次）。
  * 安全模型：不依赖登录（此时还没有管理员），靠"只能初始化一次"保证 ——
- * 系统已有任一用户（count>0）时调用返回 400，只有空库能创建。删库重建后首次调用即创建。
+ * 判断标准是"是否已存在管理员"而非"是否已存在任何用户"：V6 内置的旅客/商家演示数据
+ * 不影响初始化，只要没有管理员就仍可创建；管理员创建后 countByRole(ADMIN)>0，再次调用返回 400。
  * 校验规则：用户名非空、密码强度、联系方式至少一个且格式合法；
  * 真实姓名 / 年龄管理员可留空（User.create 按角色校验）。
  */
@@ -25,16 +26,16 @@ public class InitAppService {
     private final UserRepository userRepository;
     private final PasswordHasher passwordHasher;
 
-    /** 系统是否已初始化（是否已存在任何用户）：供前端决定是否显示初始化向导。 */
+    /** 系统是否已初始化（是否已存在管理员）：供前端决定是否显示初始化向导。 */
     public boolean isInitialized() {
-        return userRepository.count() > 0;
+        return userRepository.countByRole(UserRole.ADMIN) > 0;
     }
 
     @Transactional
     public InitAdminResult createAdmin(String username, String rawPassword, String realName,
                                        Integer age, String email, String phone) {
-        // ① 只允许一次：系统已有任何用户 -> 400（不能重复初始化）
-        if (userRepository.count() > 0) {
+        // ① 只允许一次：系统已有管理员 -> 400（不能重复初始化；内置演示用户不影响）
+        if (userRepository.countByRole(UserRole.ADMIN) > 0) {
             throw new DomainException("系统已初始化，无法再次创建初始管理员");
         }
         // ② 密码强度

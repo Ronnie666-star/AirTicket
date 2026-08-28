@@ -1,6 +1,7 @@
 package com.ronnie.airTicket.infrastructure.repository.impl;
 
 import com.ronnie.airTicket.domain.model.user.User;
+import com.ronnie.airTicket.domain.model.user.UserRole;
 import com.ronnie.airTicket.domain.repository.UserRepository;
 import com.ronnie.airTicket.infrastructure.mapper.SysUserMapper;
 import com.ronnie.airTicket.infrastructure.persistence.assembler.SysUserAssembler;
@@ -37,6 +38,11 @@ public class UserRepositoryImpl implements UserRepository {
     @Override
     public long count() {
         return sysUserMapper.count();
+    }
+
+    @Override
+    public long countByRole(UserRole role) {
+        return sysUserMapper.countByRole(role.name());
     }
 
     @Override
