@@ -14,6 +14,7 @@ const menu = [
   { label: '我的订单', name: 'orders', roles: ['PASSENGER', 'MERCHANT', 'ADMIN'] },
   { label: '个人中心', name: 'profile', roles: ['PASSENGER', 'MERCHANT', 'ADMIN'] },
   { label: '用户管理', name: 'admin-users', roles: ['ADMIN'] },
+  { label: '数据统计', name: 'admin-stats', roles: ['ADMIN'] },
   { label: '基础数据', name: 'admin-master', roles: ['ADMIN'] },
   { label: '放票管理', name: 'admin-flights', roles: ['MERCHANT', 'ADMIN'] }
 ]

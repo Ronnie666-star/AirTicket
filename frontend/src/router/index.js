@@ -14,6 +14,7 @@ const routes = [
   { path: '/orders/:id', name: 'order-detail', component: () => import('../views/OrderDetailView.vue') },
   { path: '/profile', name: 'profile', component: () => import('../views/ProfileView.vue') },
   { path: '/admin/users', name: 'admin-users', component: () => import('../views/AdminUsersView.vue'), meta: { admin: true } },
+  { path: '/admin/stats', name: 'admin-stats', component: () => import('../views/AdminStatsView.vue'), meta: { admin: true } },
   { path: '/admin/master', name: 'admin-master', component: () => import('../views/AdminMasterView.vue'), meta: { admin: true } },
   { path: '/admin/flights', name: 'admin-flights', component: () => import('../views/AdminFlightsView.vue'), meta: { merchant: true } },
   { path: '/:pathMatch(.*)*', redirect: '/' }
